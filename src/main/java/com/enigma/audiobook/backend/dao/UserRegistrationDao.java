@@ -43,7 +43,8 @@ public class UserRegistrationDao extends BaseDao {
             InsertOneResult result = collection.insertOne(new Document()
                     .append("_id", new ObjectId())
                     .append("createTime", getCurrentTime())
-                    .append("updateTime", getCurrentTime()));
+                    .append("updateTime", getCurrentTime())
+                    .append("isDeleted", false));
             // Prints the ID of the inserted document
             log.info("Success! Inserted document id: " + result.getInsertedId());
 
@@ -82,7 +83,7 @@ public class UserRegistrationDao extends BaseDao {
         }
     }
 
-    public Optional<User> getUser(String authUserId) {
+    public Optional<User> getUserWithAuthId(String authUserId) {
         MongoCollection<Document> collection = getCollection();
         // Creates instructions to project two document fields
         Bson projectionFields = Projections.fields(
@@ -90,6 +91,18 @@ public class UserRegistrationDao extends BaseDao {
         // Retrieves the first matching document, applying a projection and a descending sort to the results
         Document doc = collection.find(eq("authUserId", authUserId))
                 .projection(projectionFields)
+                .first();
+        // Prints a message if there are no result documents, or prints the result document as JSON
+        if (doc == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(gson.fromJson(doc.toJson(), User.class));
+        }
+    }
+
+    public Optional<User> getUser(String userId) {
+        MongoCollection<Document> collection = getCollection();
+        Document doc = collection.find(eq("_id", new ObjectId(userId)))
                 .first();
         // Prints a message if there are no result documents, or prints the result document as JSON
         if (doc == null) {
