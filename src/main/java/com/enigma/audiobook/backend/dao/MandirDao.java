@@ -1,6 +1,5 @@
 package com.enigma.audiobook.backend.dao;
 
-import com.enigma.audiobook.backend.models.Influencer;
 import com.enigma.audiobook.backend.models.Mandir;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
@@ -37,7 +36,7 @@ public class MandirDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         try {
             // Inserts a sample document describing a movie into the collection
-            Document doc = Document.parse(gson.toJson(mandir)).append("_id", new ObjectId());
+            Document doc = Document.parse(serde.toJson(mandir)).append("_id", new ObjectId());
             InsertOneResult result = collection.insertOne(doc);
             // Prints the ID of the inserted document
             log.info("Success! Inserted document id: " + result.getInsertedId());
@@ -63,7 +62,7 @@ public class MandirDao extends BaseDao {
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
                 Document doc = iter.next();
-                mandirs.add(gson.fromJson(doc.toJson(), Mandir.class));
+                mandirs.add(serde.fromJson(doc.toJson(), Mandir.class));
             }
         }
 
@@ -84,7 +83,7 @@ public class MandirDao extends BaseDao {
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
                 Document doc = iter.next();
-                mandirs.add(gson.fromJson(doc.toJson(), Mandir.class));
+                mandirs.add(serde.fromJson(doc.toJson(), Mandir.class));
             }
         }
 
@@ -100,7 +99,7 @@ public class MandirDao extends BaseDao {
         if (doc == null) {
             return Optional.empty();
         } else {
-            return Optional.of(gson.fromJson(doc.toJson(), Mandir.class));
+            return Optional.of(serde.fromJson(doc.toJson(), Mandir.class));
         }
     }
 

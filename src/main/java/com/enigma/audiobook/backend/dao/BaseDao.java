@@ -1,14 +1,16 @@
 package com.enigma.audiobook.backend.dao;
 
-import com.google.gson.Gson;
+import com.enigma.audiobook.backend.utils.SerDe;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Date;
 
 public class BaseDao {
-    static final Gson gson = new Gson();
+    static final SerDe serde = new SerDe();
 
-    LocalDateTime getCurrentTime() {
-        return LocalDateTime.now(ZoneId.of(ZoneId.SHORT_IDS.get("IST")));
+    Date getCurrentTime() {
+        LocalDateTime ldt = LocalDateTime.now(ZoneId.of(ZoneId.SHORT_IDS.get("IST")));
+        return Date.from(ldt.atZone(ZoneId.of(ZoneId.SHORT_IDS.get("IST"))).toInstant());
     }
 }

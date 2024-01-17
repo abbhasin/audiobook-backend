@@ -1,11 +1,15 @@
 package com.enigma.audiobook.backend.dao;
 
+import com.enigma.audiobook.backend.models.ContentUploadStatus;
+import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Influencer;
-import com.enigma.audiobook.backend.models.User;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -35,24 +39,50 @@ public class InfluencerDao extends BaseDao {
         this.database = database;
     }
 
-    public void addInfluencer(String userId, String imageUrl, String description) {
+    public Influencer addInfluencer(Influencer influencer) {
         MongoCollection<Document> collection = getCollection();
         try {
             // Inserts a sample document describing a movie into the collection
-            InsertOneResult result = collection.insertOne(new Document()
+            InsertOneResult result = collection.insertOne(Document.parse(serde.toJson(influencer))
                     .append("_id", new ObjectId())
-                    .append("userId", new ObjectId(userId))
-                    .append("imageUrl", imageUrl)
-                    .append("description", description)
+                    .append("userId", new ObjectId(influencer.getUserId()))
+                    .append("contentUploadStatus", ContentUploadStatus.PENDING)
                     .append("createTime", getCurrentTime())
                     .append("updateTime", getCurrentTime())
                     .append("isDeleted", false));
-            // Prints the ID of the inserted document
             log.info("Success! Inserted document id: " + result.getInsertedId());
 
-            // Prints a message if any exceptions occur during the operation
+            return getInfleuncer(result.getInsertedId().asObjectId().getValue().toString()).get();
         } catch (MongoException e) {
             log.error("Unable to insert into user registration", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Influencer updateInfluencer(String userId, String imageUrl, ContentUploadStatus contentUploadStatus) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("userId", new ObjectId(userId));
+
+        Bson updates = Updates.combine(
+                Updates.set("imageUrl", imageUrl),
+                Updates.set("contentUploadStatus", contentUploadStatus.name()),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to associate auth user with a user");
+            }
+
+            return getInfleuncer(userId).get();
+        } catch (Exception e) {
+            log.error("Unable to update due to an error", e);
             throw new RuntimeException(e);
         }
     }
@@ -71,18 +101,18 @@ public class InfluencerDao extends BaseDao {
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
                 Document doc = iter.next();
-                influencers.add(gson.fromJson(doc.toJson(), Influencer.class));
+                influencers.add(serde.fromJson(doc.toJson(), Influencer.class));
             }
         }
 
         return influencers;
     }
 
-    public List<Influencer> getInfleuncersPaginated(int limit, Influencer lastInfluencerObj) {
+    public List<Influencer> getInfleuncersPaginated(int limit, String lastInfluencerId) {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "userId", "imageUrl"));
-        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastInfluencerObj.getRecordId())))
+        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastInfluencerId)))
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
@@ -92,7 +122,7 @@ public class InfluencerDao extends BaseDao {
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
                 Document doc = iter.next();
-                influencers.add(gson.fromJson(doc.toJson(), Influencer.class));
+                influencers.add(serde.fromJson(doc.toJson(), Influencer.class));
             }
         }
 
@@ -108,7 +138,7 @@ public class InfluencerDao extends BaseDao {
         if (doc == null) {
             return Optional.empty();
         } else {
-            return Optional.of(gson.fromJson(doc.toJson(), Influencer.class));
+            return Optional.of(serde.fromJson(doc.toJson(), Influencer.class));
         }
     }
 

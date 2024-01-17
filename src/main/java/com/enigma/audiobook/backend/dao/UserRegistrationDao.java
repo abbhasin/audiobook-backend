@@ -35,20 +35,18 @@ public class UserRegistrationDao extends BaseDao {
         this.database = database;
     }
 
-    public void registerNewUser(String userId) {
-        MongoDatabase db = mongoClient.getDatabase(database);
-        MongoCollection<Document> collection = db.getCollection(USER_REG_COLLECTION);
+    public User registerNewUser() {
+        MongoCollection<Document> collection = getCollection();
         try {
-            // Inserts a sample document describing a movie into the collection
             InsertOneResult result = collection.insertOne(new Document()
                     .append("_id", new ObjectId())
                     .append("createTime", getCurrentTime())
                     .append("updateTime", getCurrentTime())
                     .append("isDeleted", false));
-            // Prints the ID of the inserted document
+
             log.info("Success! Inserted document id: " + result.getInsertedId());
 
-            // Prints a message if any exceptions occur during the operation
+            return getUser(result.getInsertedId().asObjectId().getValue().toString()).get();
         } catch (MongoException e) {
             log.error("Unable to insert into user registration", e);
             throw new RuntimeException(e);
@@ -56,17 +54,15 @@ public class UserRegistrationDao extends BaseDao {
     }
 
 
-
     public void associateAuthenticatedUser(String userId, String authUserId, String phoneNumber) {
-        MongoDatabase db = mongoClient.getDatabase(database);
-        MongoCollection<Document> collection = db.getCollection("movies");
-        Document query = new Document().append("_id",  new ObjectId(userId));
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(userId));
 
         Bson updates = Updates.combine(
                 Updates.set("authUserId", authUserId),
                 Updates.set("phoneNumber", phoneNumber),
                 Updates.set("updateTime", getCurrentTime())
-                );
+        );
 
         UpdateOptions options = new UpdateOptions().upsert(false);
         try {
@@ -75,6 +71,9 @@ public class UserRegistrationDao extends BaseDao {
 
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to associate auth user with a user");
+            }
 
             // Prints a message if any exceptions occur during the operation
         } catch (MongoException e) {
@@ -96,7 +95,7 @@ public class UserRegistrationDao extends BaseDao {
         if (doc == null) {
             return Optional.empty();
         } else {
-            return Optional.of(gson.fromJson(doc.toJson(), User.class));
+            return Optional.of(serde.fromJson(doc.toJson(), User.class));
         }
     }
 
@@ -108,7 +107,7 @@ public class UserRegistrationDao extends BaseDao {
         if (doc == null) {
             return Optional.empty();
         } else {
-            return Optional.of(gson.fromJson(doc.toJson(), User.class));
+            return Optional.of(serde.fromJson(doc.toJson(), User.class));
         }
     }
 

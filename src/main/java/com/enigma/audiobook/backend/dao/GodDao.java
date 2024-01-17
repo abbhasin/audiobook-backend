@@ -1,10 +1,14 @@
 package com.enigma.audiobook.backend.dao;
 
+import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.God;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -32,17 +36,51 @@ public class GodDao extends BaseDao {
         this.database = database;
     }
 
-    public void addGod(God god) {
+    public God addGod(God god) {
         MongoCollection<Document> collection = getCollection();
+        log.info("zzz god:" + serde.toJson(god));
+        log.info("zzz doc:" + Document.parse(serde.toJson(god)));
         try {
-            // Inserts a sample document describing a movie into the collection
-            Document doc = Document.parse(gson.toJson(god)).append("_id", new ObjectId());
+            Document doc = Document.parse(serde.toJson(god))
+                    .append("_id", new ObjectId())
+                    .append("createTime", getCurrentTime())
+                    .append("updateTime", getCurrentTime())
+                    .append("isDeleted", false)
+                    .append("contentUploadStatus", ContentUploadStatus.PENDING);
             InsertOneResult result = collection.insertOne(doc);
-            // Prints the ID of the inserted document
-            log.info("Success! Inserted document id: " + result.getInsertedId());
 
+            log.info("Success! Inserted document id: " + result.getInsertedId());
+            return getGod(result.getInsertedId().asObjectId().getValue().toString()).get();
         } catch (MongoException e) {
             log.error("Unable to insert into god registration", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public God updateGod(String godId, String imageUrl, ContentUploadStatus contentUploadStatus) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(godId));
+
+        Bson updates = Updates.combine(
+                Updates.set("imageUrl", imageUrl),
+                Updates.set("contentUploadStatus", contentUploadStatus.name()),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to associate auth user with a user");
+            }
+
+            return getGod(godId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error", e);
             throw new RuntimeException(e);
         }
     }
@@ -61,18 +99,18 @@ public class GodDao extends BaseDao {
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
                 Document doc = iter.next();
-                gods.add(gson.fromJson(doc.toJson(), God.class));
+                gods.add(serde.fromJson(doc.toJson(), God.class));
             }
         }
 
         return gods;
     }
 
-    public List<God> getGodsPaginated(int limit, God lastGodObj) {
+    public List<God> getGodsPaginated(int limit, String lastGodId) {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "godName", "imageUrl"));
-        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastGodObj.getGodId())))
+        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastGodId)))
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
@@ -82,7 +120,7 @@ public class GodDao extends BaseDao {
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
                 Document doc = iter.next();
-                gods.add(gson.fromJson(doc.toJson(), God.class));
+                gods.add(serde.fromJson(doc.toJson(), God.class));
             }
         }
 
@@ -98,7 +136,7 @@ public class GodDao extends BaseDao {
         if (doc == null) {
             return Optional.empty();
         } else {
-            return Optional.of(gson.fromJson(doc.toJson(), God.class));
+            return Optional.of(serde.fromJson(doc.toJson(), God.class));
         }
     }
 

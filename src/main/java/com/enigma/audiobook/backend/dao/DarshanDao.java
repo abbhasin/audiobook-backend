@@ -1,11 +1,26 @@
 package com.enigma.audiobook.backend.dao;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
+import com.enigma.audiobook.backend.models.ContentUploadStatus;
+import com.enigma.audiobook.backend.models.Darshan;
+import com.mongodb.MongoException;
+import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.springframework.stereotype.Repository;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Sorts.descending;
 
 @Slf4j
 @Repository
@@ -18,6 +33,90 @@ public class DarshanDao extends BaseDao {
     public DarshanDao(MongoClient mongoClient, String database) {
         this.mongoClient = mongoClient;
         this.database = database;
+    }
+
+    public Darshan initDarshan(Darshan darshan, String videoUploadUrlFormatter, String imageUploadUrlFormatter) {
+        MongoCollection<Document> collection = getCollection();
+        try {
+            darshan.setCreateTime(getCurrentTime());
+            darshan.setUpdateTime(getCurrentTime());
+            ObjectId id = new ObjectId();
+
+            String videoUploadUrl = String.format(videoUploadUrlFormatter, id.toString());
+            String imageUploadUrl = String.format(imageUploadUrlFormatter, id.toString());
+            darshan.setThumbnailUrl(imageUploadUrl);
+            darshan.setVideoUrl(videoUploadUrl);
+            darshan.setVideoUploadStatus(ContentUploadStatus.PENDING);
+
+            // Inserts a sample document describing a movie into the collection
+            Document doc = Document.parse(serde.toJson(darshan))
+                    .append("_id", id)
+                    .append("mandirId", new ObjectId(darshan.getMandirId()))
+                    .append("godId", new ObjectId(darshan.getGodId()));
+            InsertOneResult result = collection.insertOne(doc);
+            // Prints the ID of the inserted document
+            log.info("Success! Inserted document id: " + result.getInsertedId());
+            darshan.setDarshanId(result.getInsertedId().toString());
+            return darshan;
+        } catch (MongoException e) {
+            log.error("Unable to insert into god registration", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Darshan updateDarshan(String darshanId, ContentUploadStatus status) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id",  new ObjectId(darshanId));
+        Bson updates = Updates.set("videoUploadStatus", status.name());
+        UpdateOptions options = new UpdateOptions().upsert(false);
+
+        try {
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+
+            return getDarshan(darshanId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error: ", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Optional<Darshan> getDarshan(String darshanId) {
+        MongoCollection<Document> collection = getCollection();
+
+        Document doc = collection.find(eq("_id", new ObjectId(darshanId)))
+                .first();
+        // Prints a message if there are no result documents, or prints the result document as JSON
+        if (doc == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(serde.fromJson(doc.toJson(), Darshan.class));
+        }
+    }
+
+    public List<Darshan> getDarshans(String mandirId, String godId, ContentUploadStatus status) {
+        MongoCollection<Document> collection = getCollection();
+        Bson filter = Filters.and(
+                Filters.eq("mandirId", new ObjectId(mandirId)),
+                Filters.eq("godId", new ObjectId(godId)),
+                Filters.eq("videoUploadStatus", status.name()));
+
+        FindIterable<Document> docs = collection.find(filter)
+                .sort(descending("createTime"))
+                .limit(10);
+
+        List<Darshan> darshans = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                darshans.add(serde.fromJson(doc.toJson(), Darshan.class));
+            }
+        }
+
+        return darshans;
     }
 
     private MongoCollection<Document> getCollection() {
