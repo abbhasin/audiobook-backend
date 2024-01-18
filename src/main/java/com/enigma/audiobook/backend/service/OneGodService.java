@@ -1,23 +1,17 @@
 package com.enigma.audiobook.backend.service;
 
-import com.enigma.audiobook.backend.dao.GodDao;
-import com.enigma.audiobook.backend.dao.InfluencerDao;
-import com.enigma.audiobook.backend.dao.PostsDao;
-import com.enigma.audiobook.backend.dao.UserRegistrationDao;
+import com.enigma.audiobook.backend.dao.*;
 import com.enigma.audiobook.backend.models.*;
-import com.enigma.audiobook.backend.models.requests.GodImageUploadReq;
-import com.enigma.audiobook.backend.models.requests.InfluencerImageUploadReq;
-import com.enigma.audiobook.backend.models.requests.PostContentUploadReq;
-import com.enigma.audiobook.backend.models.requests.UserRegistrationInfo;
-import com.enigma.audiobook.backend.models.responses.GodInitResponse;
-import com.enigma.audiobook.backend.models.responses.InfluencerInitResponse;
-import com.enigma.audiobook.backend.models.responses.PostInitResponse;
-import com.enigma.audiobook.backend.models.responses.UserAssociationResponse;
+import com.enigma.audiobook.backend.models.requests.*;
+import com.enigma.audiobook.backend.models.responses.*;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
@@ -29,6 +23,10 @@ public class OneGodService {
     private final GodDao godDao;
     private final InfluencerDao influencerDao;
     private final PostsDao postsDao;
+    private final DarshanDao darshanDao;
+    private final CuratedDarshanDao curatedDarshanDao;
+    private final MandirDao mandirDao;
+    private final MandirAuthDao mandirAuthDao;
 
     public User createUser() {
         return userRegistrationDao.registerNewUser();
@@ -102,6 +100,7 @@ public class OneGodService {
 
 
     public PostInitResponse initPosts(Post posts) {
+        checkAuthorization(posts.getFromUserId());
         if (posts.getType() == null) {
             posts.setType(PostType.TEXT);
         }
@@ -114,6 +113,7 @@ public class OneGodService {
 
 
     public Post postUploadUpdatePost(PostContentUploadReq postContentUploadReq) {
+        checkAuthorization(postContentUploadReq.getFromUserId());
         Post post = postsDao.updatePost(postContentUploadReq.getPostId(),
                 postContentUploadReq.getContentUploadStatus(),
                 postContentUploadReq.getPostType(),
@@ -135,5 +135,105 @@ public class OneGodService {
     public List<Post> getPostsPaginated(int limit, String id, PostAssociationType associationType,
                                         String lastPostId) {
         return postsDao.getPostsPaginated(id, associationType, limit, lastPostId);
+    }
+
+    public DarshanInitResponse initDarshan(Darshan darshan) {
+        darshan.setVideoUploadStatus(ContentUploadStatus.PENDING);
+        Darshan darshanRes = darshanDao.initDarshan(darshan);
+        return new DarshanInitResponse(getDarshanVideoUploadDirS3Url(darshanRes.getDarshanId()),
+                darshanRes);
+    }
+
+
+    public Darshan postUploadUpdateDarshan(DarshanContentUploadReq darshanContentUploadReq) {
+        return darshanDao.updateDarshan(darshanContentUploadReq.getDarshanId(),
+                darshanContentUploadReq.getThumbnailUrl(),
+                darshanContentUploadReq.getVideoUrl(),
+                darshanContentUploadReq.getStatus());
+    }
+
+    public List<Darshan> getCuratedDarshans() {
+        Optional<CuratedDarshan> curatedDarshan =
+                curatedDarshanDao.getLastNCuratedDarshan(1).stream().findFirst();
+
+        Map<String, List<String>> curatedDarshans = curatedDarshan.get().getGodToDarshanIds();
+        List<Darshan> darshans = new ArrayList<>();
+
+        Map<String, Integer> godNameToCounter = curatedDarshans.entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+
+        while (true) {
+            for (Map.Entry<String, Integer> entry : godNameToCounter.entrySet()) {
+                int counter = entry.getValue();
+                if (counter > 0) {
+                    List<String> darshansForGod = curatedDarshans.get(entry.getKey());
+                    String darshanId = darshansForGod.get(darshansForGod.size() - counter);
+                    Darshan darshan = darshanDao.getDarshan(darshanId).get();
+                    darshans.add(darshan);
+                    counter--;
+                    entry.setValue(counter);
+                }
+            }
+            boolean allZero = true;
+            for (Map.Entry<String, Integer> entry : godNameToCounter.entrySet()) {
+                allZero = allZero && entry.getValue() <= 0;
+            }
+
+            if (allZero) {
+                break;
+            }
+        }
+
+        return darshans;
+    }
+
+    public MandirInitResponse initMandir(Mandir mandir) {
+        mandir.setImageUploadStatus(ContentUploadStatus.PENDING);
+        Mandir mandirRes = mandirDao.initMandir(mandir);
+        return new MandirInitResponse(getMandirImageUploadDirS3Url(mandirRes.getMandirId()),
+                mandirRes);
+    }
+
+
+    public Mandir postUploadUpdateMandir(MandirContentUploadReq mandirContentUploadReq) {
+        return mandirDao.updateMandir(mandirContentUploadReq.getMandirId(),
+                mandirContentUploadReq.getImageUrl(),
+                mandirContentUploadReq.getStatus());
+    }
+
+    public Mandir getMandir(String mandirId) {
+        return mandirDao.getMandir(mandirId).orElse(null);
+    }
+
+    public List<Mandir> getMandirs(int limit) {
+        return mandirDao.getMandirs(limit);
+    }
+
+    public List<Mandir> getMandirsPaginated(int limit, String lastMandirId) {
+        return mandirDao.getMandirsPaginated(limit, lastMandirId);
+    }
+
+    public void addMandirAuth(String mandirId, String userId) {
+        checkAuthorization(userId);
+        mandirAuthDao.addMandirAuth(mandirId, userId, MandirAuth.ADMIN);
+    }
+
+    public List<Mandir> getAuthorizedMandirForUser(String userId) {
+        checkAuthorization(userId);
+        return mandirAuthDao.getMandirsWithAdminPermission(userId)
+                .stream()
+                .map(mandirId -> mandirDao.getMandir(mandirId).get())
+                .collect(Collectors.toList());
+    }
+
+
+
+    private void checkAuthorization(String userId) {
+        Optional<User> user = userRegistrationDao.getUser(userId);
+        if (user.isEmpty() || StringUtils.isEmpty(user.get().getAuthUserId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "user is not authorized:" + userId);
+        }
     }
 }

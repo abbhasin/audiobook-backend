@@ -10,6 +10,7 @@ import java.util.List;
 @Data
 public class PostContentUploadReq {
     String postId;
+    String fromUserId;
     List<String> imagesUrl;
     String thumnailUrl;
     String videoUrl;

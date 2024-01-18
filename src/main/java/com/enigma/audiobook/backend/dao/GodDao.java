@@ -38,8 +38,7 @@ public class GodDao extends BaseDao {
 
     public God addGod(God god) {
         MongoCollection<Document> collection = getCollection();
-        log.info("zzz god:" + serde.toJson(god));
-        log.info("zzz doc:" + Document.parse(serde.toJson(god)));
+
         try {
             Document doc = Document.parse(serde.toJson(god))
                     .append("_id", new ObjectId())
@@ -131,6 +130,19 @@ public class GodDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
 
         Document doc = collection.find(eq("_id", new ObjectId(godId)))
+                .first();
+        // Prints a message if there are no result documents, or prints the result document as JSON
+        if (doc == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(serde.fromJson(doc.toJson(), God.class));
+        }
+    }
+
+    public Optional<God> getGodByName(String godName) {
+        MongoCollection<Document> collection = getCollection();
+
+        Document doc = collection.find(eq("godName", new ObjectId(godName)))
                 .first();
         // Prints a message if there are no result documents, or prints the result document as JSON
         if (doc == null) {

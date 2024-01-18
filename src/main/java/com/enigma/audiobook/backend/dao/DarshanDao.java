@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Sorts.ascending;
 import static com.mongodb.client.model.Sorts.descending;
 
 @Slf4j
@@ -35,17 +36,13 @@ public class DarshanDao extends BaseDao {
         this.database = database;
     }
 
-    public Darshan initDarshan(Darshan darshan, String videoUploadUrlFormatter, String imageUploadUrlFormatter) {
+    public Darshan initDarshan(Darshan darshan) {
         MongoCollection<Document> collection = getCollection();
         try {
             darshan.setCreateTime(getCurrentTime());
             darshan.setUpdateTime(getCurrentTime());
             ObjectId id = new ObjectId();
 
-            String videoUploadUrl = String.format(videoUploadUrlFormatter, id.toString());
-            String imageUploadUrl = String.format(imageUploadUrlFormatter, id.toString());
-            darshan.setThumbnailUrl(imageUploadUrl);
-            darshan.setVideoUrl(videoUploadUrl);
             darshan.setVideoUploadStatus(ContentUploadStatus.PENDING);
 
             // Inserts a sample document describing a movie into the collection
@@ -56,18 +53,21 @@ public class DarshanDao extends BaseDao {
             InsertOneResult result = collection.insertOne(doc);
             // Prints the ID of the inserted document
             log.info("Success! Inserted document id: " + result.getInsertedId());
-            darshan.setDarshanId(result.getInsertedId().toString());
-            return darshan;
+            return getDarshan(result.getInsertedId().asObjectId().getValue().toString()).get();
         } catch (MongoException e) {
             log.error("Unable to insert into god registration", e);
             throw new RuntimeException(e);
         }
     }
 
-    public Darshan updateDarshan(String darshanId, ContentUploadStatus status) {
+    public Darshan updateDarshan(String darshanId, String thumbnailUrl, String videoUrl, ContentUploadStatus status) {
         MongoCollection<Document> collection = getCollection();
-        Document query = new Document().append("_id",  new ObjectId(darshanId));
-        Bson updates = Updates.set("videoUploadStatus", status.name());
+        Document query = new Document().append("_id", new ObjectId(darshanId));
+        Bson updates = Updates.combine(
+                Updates.set("videoUploadStatus", status.name()),
+                Updates.set("thumbnailUrl", thumbnailUrl),
+                Updates.set("videoUrl", videoUrl)
+        );
         UpdateOptions options = new UpdateOptions().upsert(false);
 
         try {
@@ -75,6 +75,10 @@ public class DarshanDao extends BaseDao {
 
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
+
+            if (result.getModifiedCount() <= 0) {
+                throw new IllegalStateException("unable to update darshan:" + darshanId);
+            }
 
             return getDarshan(darshanId).get();
         } catch (MongoException e) {
@@ -106,6 +110,41 @@ public class DarshanDao extends BaseDao {
         FindIterable<Document> docs = collection.find(filter)
                 .sort(descending("createTime"))
                 .limit(10);
+
+        List<Darshan> darshans = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                darshans.add(serde.fromJson(doc.toJson(), Darshan.class));
+            }
+        }
+
+        return darshans;
+    }
+
+    public List<Darshan> getDarshanByGod(String godId, ContentUploadStatus status,
+                                         Optional<String> lastDarshanIdOpt,
+                                         Optional<String> excludeMandirIdOpt,
+                                         int limit) {
+        MongoCollection<Document> collection = getCollection();
+        Bson filter = Filters.and(
+                Filters.eq("godId", new ObjectId(godId)),
+                Filters.eq("videoUploadStatus", status.name()));
+
+        if(excludeMandirIdOpt.isPresent()) {
+            filter = Filters.and(Filters.ne("mandirId", new ObjectId(excludeMandirIdOpt.get())),
+                    filter);
+        }
+
+        if (lastDarshanIdOpt.isPresent()) {
+            filter = Filters.and(Filters.gt("_id", new ObjectId(lastDarshanIdOpt.get())),
+                    filter);
+        }
+
+        FindIterable<Document> docs = collection.find(filter)
+                .sort(ascending("_id"))
+                .limit(limit);
 
         List<Darshan> darshans = new ArrayList<>();
 

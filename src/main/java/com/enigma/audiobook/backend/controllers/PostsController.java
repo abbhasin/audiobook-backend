@@ -17,7 +17,7 @@ public class PostsController {
 
     @PostMapping("/posts/initialization")
     @ResponseBody
-    public PostInitResponse initInfluencer(@RequestBody Post posts) {
+    public PostInitResponse initPost(@RequestBody Post posts) {
         return oneGodService.initPosts(posts);
     }
 

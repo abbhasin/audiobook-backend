@@ -25,4 +25,12 @@ public class ObjectStoreMappingUtils {
     public static String getPostVideoUploadDirS3UrlPostProcessing(String postId) {
         return String.format("s3://one-god-dev/posts/video/%s/processed/", postId);
     }
+
+    public static String getDarshanVideoUploadDirS3Url(String postId) {
+        return String.format("s3://one-god-dev/darshans/video/%s/raw/", postId);
+    }
+
+    public static String getMandirImageUploadDirS3Url(String mandirId) {
+        return String.format("s3://one-god-dev/mandirs/images/%s/", mandirId);
+    }
 }

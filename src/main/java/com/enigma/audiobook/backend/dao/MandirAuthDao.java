@@ -1,6 +1,5 @@
 package com.enigma.audiobook.backend.dao;
 
-import com.enigma.audiobook.backend.models.Mandir;
 import com.enigma.audiobook.backend.models.MandirAuth;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
@@ -13,20 +12,18 @@ import org.bson.types.ObjectId;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.eq;
 
 @Slf4j
 @Repository
-public class MandirAuthroizations extends BaseDao {
+public class MandirAuthDao extends BaseDao {
     private final MongoClient mongoClient;
     private final String database;
     private static final String MANDIR_AUTH_COLLECTION = "mandirAuth";
 
-    public MandirAuthroizations(MongoClient mongoClient, String database) {
+    public MandirAuthDao(MongoClient mongoClient, String database) {
         this.mongoClient = mongoClient;
         this.database = database;
     }

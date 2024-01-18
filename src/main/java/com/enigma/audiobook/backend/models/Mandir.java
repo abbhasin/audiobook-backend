@@ -12,6 +12,7 @@ public class Mandir {
     String mandirId;
     String name;
     String imageUrl;
+    ContentUploadStatus imageUploadStatus;
     String description;
     Address address;
     Quality quality;

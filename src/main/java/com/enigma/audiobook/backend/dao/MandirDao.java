@@ -1,10 +1,15 @@
 package com.enigma.audiobook.backend.dao;
 
+import com.enigma.audiobook.backend.models.ContentUploadStatus;
+import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Mandir;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -32,18 +37,51 @@ public class MandirDao extends BaseDao {
         this.database = database;
     }
 
-    public void addMandir(Mandir mandir) {
+    public Mandir initMandir(Mandir mandir) {
         MongoCollection<Document> collection = getCollection();
         try {
             // Inserts a sample document describing a movie into the collection
-            Document doc = Document.parse(serde.toJson(mandir)).append("_id", new ObjectId());
+            Document doc = Document.parse(serde.toJson(mandir))
+                    .append("_id", new ObjectId())
+                    .append("imageUploadStatus", ContentUploadStatus.PENDING)
+                    .append("createTime", getCurrentTime())
+                    .append("updateTime", getCurrentTime())
+                    .append("isDeleted", false);
             InsertOneResult result = collection.insertOne(doc);
             // Prints the ID of the inserted document
             log.info("Success! Inserted document id: " + result.getInsertedId());
 
-            // Prints a message if any exceptions occur during the operation
+            return getMandir(result.getInsertedId().asObjectId().getValue().toString()).get();
         } catch (MongoException e) {
             log.error("Unable to insert into user registration", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Mandir updateMandir(String mandirId, String imageUrl, ContentUploadStatus imageUploadStatus) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(mandirId));
+
+        Bson updates = Updates.combine(
+                Updates.set("imageUrl", imageUrl),
+                Updates.set("imageUploadStatus", imageUploadStatus.name()),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to update");
+            }
+
+            return getMandir(mandirId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error", e);
             throw new RuntimeException(e);
         }
     }
@@ -69,11 +107,11 @@ public class MandirDao extends BaseDao {
         return mandirs;
     }
 
-    public List<Mandir> getMandirsPaginated(int limit, Mandir lastMandirObj) {
+    public List<Mandir> getMandirsPaginated(int limit, String lastMandirId) {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "imageUrl", "address"));
-        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastMandirObj.getMandirId())))
+        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastMandirId)))
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
