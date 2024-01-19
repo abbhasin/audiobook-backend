@@ -148,7 +148,7 @@ public class PostsDao extends BaseDao {
         }
     }
 
-    public List<Post> getPosts(String id, PostAssociationType associationType, int limit) {
+    public List<Post> getPosts(String associationId, PostAssociationType associationType, int limit) {
         MongoCollection<Document> collection = getCollection();
         Bson contentFilter = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
@@ -157,13 +157,13 @@ public class PostsDao extends BaseDao {
         Bson idFilter;
         switch (associationType) {
             case MANDIR:
-                idFilter = Filters.eq("associatedMandirId", new ObjectId(id));
+                idFilter = Filters.eq("associatedMandirId", new ObjectId(associationId));
                 break;
             case INFLUENCER:
-                idFilter = Filters.eq("associatedInfluencerId", new ObjectId(id));
+                idFilter = Filters.eq("associatedInfluencerId", new ObjectId(associationId));
                 break;
             case GOD:
-                idFilter = Filters.eq("associatedGodId", new ObjectId(id));
+                idFilter = Filters.eq("associatedGodId", new ObjectId(associationId));
                 break;
             default:
                 throw new IllegalStateException("unhandled association type:" + associationType);
@@ -189,7 +189,7 @@ public class PostsDao extends BaseDao {
         return posts;
     }
 
-    public List<Post> getPostsPaginated(String id, PostAssociationType associationType, int limit, String lastPostId) {
+    public List<Post> getPostsPaginated(String associationId, PostAssociationType associationType, int limit, String lastPostId) {
         MongoCollection<Document> collection = getCollection();
         Bson contentFilter = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
@@ -198,13 +198,13 @@ public class PostsDao extends BaseDao {
         Bson associationIdFilter;
         switch (associationType) {
             case MANDIR:
-                associationIdFilter = Filters.eq("associatedMandirId", new ObjectId(id));
+                associationIdFilter = Filters.eq("associatedMandirId", new ObjectId(associationId));
                 break;
             case INFLUENCER:
-                associationIdFilter = Filters.eq("associatedInfluencerId", new ObjectId(id));
+                associationIdFilter = Filters.eq("associatedInfluencerId", new ObjectId(associationId));
                 break;
             case GOD:
-                associationIdFilter = Filters.eq("associatedGodId", new ObjectId(id));
+                associationIdFilter = Filters.eq("associatedGodId", new ObjectId(associationId));
                 break;
             default:
                 throw new IllegalStateException("unhandled association type:" + associationType);
@@ -229,6 +229,45 @@ public class PostsDao extends BaseDao {
         }
 
         return posts;
+    }
+
+    public List<Post> getPostsByType(PostType postType, int limit, Optional<String> lastPostId) {
+        MongoCollection<Document> collection = getCollection();
+        Bson finalFilter = getFinalFilter(postType, lastPostId);
+
+        FindIterable<Document> docs = collection.find(finalFilter)
+                .sort(descending("_id")) // _id contains the create time as well
+                .limit(limit);
+
+        List<Post> posts = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                posts.add(serde.fromJson(doc.toJson(), Post.class));
+            }
+        }
+
+        return posts;
+    }
+
+    private static Bson getFinalFilter(PostType postType, Optional<String> lastPostId) {
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        Bson postTypeFilter = Filters.eq("type", postType.name());
+        ;
+        Bson finalFilter = Filters.and(
+                contentFilter,
+                postTypeFilter
+        );
+
+        if (lastPostId.isPresent()) {
+            Bson postIdFilter = Filters.lt("_id", new ObjectId(lastPostId.get()));
+            finalFilter = Filters.and(finalFilter, postIdFilter);
+        }
+        return finalFilter;
     }
 
     private MongoCollection<Document> getCollection() {
