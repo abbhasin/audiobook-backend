@@ -6,13 +6,11 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Data;
 
 @Data
-public class ScoredContent {
+public class NewPost {
     @JsonProperty("_id")
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String id;
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String postId;
-    Integer score;
     PostType postType;
-
 }

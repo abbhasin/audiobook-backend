@@ -1,19 +1,25 @@
 package com.enigma.audiobook.backend.dao;
 
+import com.enigma.audiobook.backend.models.PostType;
 import com.enigma.audiobook.backend.models.ScoredContent;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.result.InsertManyResult;
+import com.mongodb.client.result.InsertOneResult;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.springframework.stereotype.Repository;
 
+import javax.print.Doc;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.mongodb.client.model.Sorts.ascending;
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Sorts.*;
 
 @Slf4j
 @Repository
@@ -28,12 +34,13 @@ public class ScoredContentDao extends BaseDao {
         this.database = database;
     }
 
-    public void addBulkContentScores(String suffix, List<ScoredContent> scoredContents) {
+    public void addBulkScoredContent(String suffix, List<ScoredContent> scoredContents) {
         MongoCollection<Document> collection = getCollection(suffix);
 
         List<Document> docs = scoredContents.stream()
                 .map(sc -> {
                     Document doc = Document.parse(serde.toJson(sc));
+                    doc.append("_id", new ObjectId());
                     doc.append("postId", new ObjectId(doc.getString("postId")));
                     return doc;
                 })
@@ -49,12 +56,26 @@ public class ScoredContentDao extends BaseDao {
         }
     }
 
-    public List<ScoredContent> getScoredContentSorted(String suffix, int limit) {
+    public void addScoredContent(String suffix, ScoredContent scoredContent) {
         MongoCollection<Document> collection = getCollection(suffix);
 
-        FindIterable<Document> docs = collection.find()
-                .sort(ascending("score","_id"))
-//                .sort(ascending("_id"))
+        Document doc = Document.parse(serde.toJson(scoredContent));
+        doc.append("_id", new ObjectId());
+        doc.append("postId", new ObjectId(doc.getString("postId")));
+
+        try {
+            InsertOneResult result = collection.insertOne(doc);
+            log.info("Inserted document id: " + result.getInsertedId());
+        } catch (Exception e) {
+            log.error("Unable to insert due to an error", e);
+        }
+    }
+
+    public List<ScoredContent> getScoredContentSorted(String suffix, int limit, PostType postType) {
+        MongoCollection<Document> collection = getCollection(suffix);
+
+        FindIterable<Document> docs = collection.find(eq("postType", postType.name()))
+                .sort(descending("score", "postId"))
                 .limit(limit);
 
         List<ScoredContent> scoreContent = new ArrayList<>();
@@ -69,20 +90,23 @@ public class ScoredContentDao extends BaseDao {
     }
 
     public List<ScoredContent> getScoredContentSortedPaginated(String suffix, int limit,
+                                                               PostType postType,
                                                                ScoredContent lastScoredContent
     ) {
         MongoCollection<Document> collection = getCollection(suffix);
 
-        Bson filterScoreGreater = Filters.gt("score", lastScoredContent.getScore());
+        Bson filterScoreLesser = Filters.lt("score", lastScoredContent.getScore());
 
-        Bson filterScoreEqual = Filters.eq("score", lastScoredContent.getScore());
-        Bson filterObjIdGreater = Filters.gt("_id", new ObjectId(lastScoredContent.getId()));
-        Bson filterScoreAndObjId = Filters.and(filterScoreEqual, filterObjIdGreater);
+        Bson filterScoreEqual = eq("score", lastScoredContent.getScore());
+        Bson filterPostIdLesser = Filters.lt("postId", new ObjectId(lastScoredContent.getPostId()));
+        Bson filterScoreAndPostId = Filters.and(filterScoreEqual, filterPostIdLesser);
 
-        Bson finalFilter = Filters.or(filterScoreGreater, filterScoreAndObjId);
+        Bson finalFilter = Filters.and(eq("postType", postType.name()),
+                Filters.or(filterScoreLesser, filterScoreAndPostId));
 
+//        Bson orderBySort = orderBy(descending("score"), ascending("_id"));
         FindIterable<Document> docs = collection.find(finalFilter)
-                .sort(ascending("score","_id"))
+                .sort(descending("score", "postId"))
                 .limit(limit);
 
         List<ScoredContent> scoreContent = new ArrayList<>();
@@ -96,9 +120,28 @@ public class ScoredContentDao extends BaseDao {
         return scoreContent;
     }
 
+    public void initCollectionAndIndexes(String suffix) {
+        String collName = getCollectionName(suffix);
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(collName);
+
+        MongoCollection<Document> collection = db.getCollection(collName);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("score_and_postId_descending_index")
+                .unique(true);
+        String resultCreateIndex = collection.createIndex(Indexes.descending("score", "postId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+    }
+
 
     private MongoCollection<Document> getCollection(String suffix) {
         MongoDatabase db = mongoClient.getDatabase(database);
-        return db.getCollection(String.format(SCORED_CONTENT_COLLECTION_FORMAT, suffix));
+        return db.getCollection(getCollectionName(suffix));
+    }
+
+    private String getCollectionName(String suffix) {
+        return String.format(SCORED_CONTENT_COLLECTION_FORMAT, suffix);
     }
 }

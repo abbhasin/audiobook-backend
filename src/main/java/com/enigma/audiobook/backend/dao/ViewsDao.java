@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Sorts.ascending;
+import static com.mongodb.client.model.Sorts.descending;
 
 @Slf4j
 @Repository
@@ -72,7 +73,7 @@ public class ViewsDao extends BaseDao {
 
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
-            if (result.getModifiedCount() <= 0) {
+            if (result.getModifiedCount() <= 0 && result.getUpsertedId() == null) {
                 throw new RuntimeException("unable to associate auth user with a user");
             }
         } catch (MongoException e) {
@@ -126,7 +127,7 @@ public class ViewsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
 
         FindIterable<Document> docs = collection.find(eq("postId", new ObjectId(postId)))
-                .sort(ascending("_id"))
+                .sort(descending("_id"))
                 .limit(limit);
 
         List<View> views = new ArrayList<>();
@@ -146,14 +147,14 @@ public class ViewsDao extends BaseDao {
         Bson finalFilter = Filters.eq("postId", new ObjectId(postId));
 
         if (lastViewId.isPresent()) {
-            Bson filterIdGreater = Filters.gt("_id", lastViewId.get());
+            Bson filterIdLesser = Filters.lt("_id", lastViewId.get());
             finalFilter = Filters.and(
                     finalFilter,
-                    filterIdGreater);
+                    filterIdLesser);
         }
 
         FindIterable<Document> docs = collection.find(finalFilter)
-                .sort(ascending("_id"))
+                .sort(descending("_id"))
                 .limit(limit);
 
         List<View> views = new ArrayList<>();

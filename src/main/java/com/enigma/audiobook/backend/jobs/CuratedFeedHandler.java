@@ -1,59 +1,96 @@
 package com.enigma.audiobook.backend.jobs;
 
+import com.enigma.audiobook.backend.dao.NewPostsDao;
 import com.enigma.audiobook.backend.dao.PostsDao;
+import com.enigma.audiobook.backend.dao.ScoredContentDao;
 import com.enigma.audiobook.backend.dao.ViewsDao;
-import com.enigma.audiobook.backend.models.Post;
-import com.enigma.audiobook.backend.models.PostType;
-import com.enigma.audiobook.backend.models.View;
+import com.enigma.audiobook.backend.models.*;
 import lombok.AllArgsConstructor;
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Component
 @AllArgsConstructor
 public class CuratedFeedHandler implements Runnable {
     PostsDao postsDao;
     ViewsDao viewsDao;
+    ScoredContentDao scoredContentDao;
+    NewPostsDao newPostsDao;
+
+    static final Integer MIN_VIEWS_THRESHOLD_FOR_SCORING = 20;
+    static final Integer THIRTY_SEC = 30;
+    static final Integer SIXTY_SEC = 60;
+
+    static final Integer TWENTY_SEC = 20;
+    static final Integer FORTY_SEC = 40;
+    static final float SCORE_FACTOR = 1.41f;
 
     @Override
     public void run() {
+        String scoredContentCollectionSuffix = generateSuffix();
+        scoredContentDao.initCollectionAndIndexes(scoredContentCollectionSuffix);
 
-        while (true) {
-            List<Post> posts = postsDao.getPostsByType(PostType.VIDEO, 10000, Optional.empty());
-            if (posts.isEmpty()) {
-                break;
+        addScoredContent(scoredContentCollectionSuffix, PostType.VIDEO, SIXTY_SEC, THIRTY_SEC);
+        addScoredContent(scoredContentCollectionSuffix, PostType.AUDIO, FORTY_SEC, TWENTY_SEC);
+    }
+
+    private void addScoredContent(String collectionSuffix,
+                                  PostType postType,
+                                  int tierOneViewDurationThreshold,
+                                  int tierTwoViewDuration) {
+        List<Post> posts = postsDao.getPostsByType(postType, 10000, Optional.empty());
+
+        posts.forEach(post -> {
+            List<View> viewsForPost = viewsDao.getViewsForPostNext(post.getPostId(), 1000,
+                    Optional.empty());
+
+            if (viewsForPost.size() < MIN_VIEWS_THRESHOLD_FOR_SCORING) {
+                NewPost newPost = new NewPost();
+                newPost.setPostType(postType);
+                newPost.setPostId(post.getPostId());
+                newPostsDao.upsertNewPost(newPost);
+                return;
+            } else {
+                newPostsDao.removeFromNewPosts(post.getPostId());
             }
-            posts.forEach(post -> {
-                String lastViewId = null;
-                while (true) {
-                    List<View> viewsForPost = viewsDao.getViewsForPostNext(post.getPostId(), 1000,
-                            Optional.ofNullable(lastViewId));
-                    if (viewsForPost.isEmpty()) {
-                        break;
-                    }
-                    lastViewId = viewsForPost.get(viewsForPost.size() - 1).getId();
 
-                    DescriptiveStatistics descriptiveStatistics = new DescriptiveStatistics();
+            List<Integer> viewDurations = viewsForPost.stream()
+                    .map(View::getViewDurationSec)
+                    .toList();
+            int totalViews = viewDurations.size();
 
-                    List<Integer> viewDurations = viewsForPost.stream()
-                            .map(View::getViewDurationSec)
-                            .toList();
-                    viewDurations.forEach(descriptiveStatistics::addValue);
+            long numOfViewsGreaterThanTierOneThreshold = viewDurations
+                    .stream()
+                    .filter(duration -> duration > tierOneViewDurationThreshold)
+                    .count();
+            long numOfViewsGreaterThanTierTwoThreshold = viewDurations
+                    .stream()
+                    .filter(duration -> duration < tierOneViewDurationThreshold
+                            && duration > tierTwoViewDuration)
+                    .count();
+            float tierOnePercent = ((float) numOfViewsGreaterThanTierOneThreshold / totalViews) * 100;
+            float tierTwoPercent = ((float) numOfViewsGreaterThanTierTwoThreshold / totalViews) * 100;
 
-                    Integer medianViewDuration = (int) descriptiveStatistics.getPercentile(50);
-                    Integer totalViews = viewDurations.size();
+            int score = (int) (tierTwoPercent * Math.pow(SCORE_FACTOR, 1) +
+                    tierOnePercent * Math.pow(SCORE_FACTOR, 2));
 
+            ScoredContent sc = new ScoredContent();
+            sc.setScore(score);
+            sc.setPostId(post.getPostId());
+            sc.setPostType(postType);
 
+            scoredContentDao.addScoredContent(collectionSuffix, sc);
+        });
 
-                }
+    }
 
-            });
-        }
-
-
+    private String generateSuffix() {
+        return LocalDateTime.now(ZoneId.of(ZoneId.SHORT_IDS.get("IST")))
+                .format(DateTimeFormatter.ISO_DATE_TIME).toString();
     }
 }
