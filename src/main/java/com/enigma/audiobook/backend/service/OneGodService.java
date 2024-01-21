@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
@@ -27,6 +29,10 @@ public class OneGodService {
     private final CuratedDarshanDao curatedDarshanDao;
     private final MandirDao mandirDao;
     private final MandirAuthDao mandirAuthDao;
+    private final FollowingsDao followingsDao;
+    private final ScoredContentDao scoredContentDao;
+    private final ViewsDao viewsDao;
+    private final NewPostsDao newPostsDao;
 
     public User createUser() {
         return userRegistrationDao.registerNewUser();
@@ -227,6 +233,156 @@ public class OneGodService {
                 .collect(Collectors.toList());
     }
 
+    public List<CuratedFeedResponse> getCuratedFeed(String userId) {
+        List<Following> followingsForUser = followingsDao.getFollowingsForUser(userId);
+
+        List<Following> mandirFollowings =
+                followingsForUser.stream()
+                        .filter(f -> f.getFollowerType().equals(FollowerType.MANDIR))
+                        .toList();
+
+        Map<String, List<Post>> lastNMandirFollowingPosts =
+                mandirFollowings.stream()
+                        .collect(Collectors.toMap(Following::getFolloweeId,
+                                f -> postsDao.getPosts(f.getFolloweeId(), PostAssociationType.MANDIR, 100)));
+
+        List<String> scoredContentVideosPostIds =
+                scoredContentDao.getScoredContentSorted("", 1000, PostType.VIDEO)
+                        .stream().map(ScoredContent::getPostId).toList();
+
+        List<String> newVideosPostIds = newPostsDao.getNewPostsByTypeNext(PostType.VIDEO, 100, Optional.empty())
+                .stream().map(NewPost::getPostId).toList();
+
+        Set<String> viewedPostIdsForUser = new HashSet<>(viewsDao.getViewsForUser(userId, 10000)
+                .stream().map(View::getPostId).toList());
+
+        /**
+         * Feed Logic:
+         */
+        List<Map.Entry<String, List<Post>>> postEntriesByMandir =
+                new ArrayList<>(lastNMandirFollowingPosts.entrySet());
+        AtomicInteger mandirPostsTotalCount =
+                new AtomicInteger((int) lastNMandirFollowingPosts.values()
+                        .stream()
+                        .mapToLong(List::size)
+                        .sum());
+        AtomicInteger postEntriesByMandirPtr = new AtomicInteger(0);
+
+        Map<String, Integer> postEntriesPtrByMandir =
+                lastNMandirFollowingPosts.entrySet()
+                        .stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+
+
+        AtomicInteger scoredContentVideosPostIdsCount = new AtomicInteger(scoredContentVideosPostIds.size());
+        AtomicInteger newVideosPostIdsCount = new AtomicInteger(newVideosPostIds.size());
+
+        List<Post> curatedPosts = new ArrayList<>();
+        Set<String> curatedPostIds = new HashSet<>();
+
+        Integer countOfMandirPostPerIteration = 4;
+        Integer countOfScoredVideoPostsPerIteration = 2;
+        Integer countOfNewVideoPostsPerIteration = 2;
+        Integer countOfScoredAudioPostsPerIteration = 2;
+
+        while (curatedPostIds.size() < 100 &&
+                (mandirPostsTotalCount.get() != 0 || scoredContentVideosPostIdsCount.get() != 0
+                        || newVideosPostIdsCount.get() != 0)) {
+
+            // mandir posts
+            addMandirPosts(countOfMandirPostPerIteration,
+                    mandirPostsTotalCount,
+                    postEntriesByMandir,
+                    postEntriesByMandirPtr,
+                    postEntriesPtrByMandir,
+                    curatedPostIds,
+                    viewedPostIdsForUser,
+                    curatedPosts);
+
+            // scored content posts
+            addContent(countOfScoredVideoPostsPerIteration,
+                    scoredContentVideosPostIdsCount,
+                    scoredContentVideosPostIds,
+                    curatedPostIds,
+                    viewedPostIdsForUser,
+                    curatedPosts);
+            // new videos
+            addContent(countOfNewVideoPostsPerIteration,
+                    newVideosPostIdsCount,
+                    newVideosPostIds,
+                    curatedPostIds,
+                    viewedPostIdsForUser,
+                    curatedPosts);
+        }
+
+        return new ArrayList<>();
+    }
+
+    /**
+     * round robin over all following mandirs, adding posts if not viewed or already added toll
+     * mandir posts count for this iteration.
+     */
+    private void addMandirPosts(Integer mandirPostsCount,
+                                AtomicInteger mandirPostsTotalCount,
+                                List<Map.Entry<String, List<Post>>> postEntriesByMandir,
+                                AtomicInteger postEntriesByMandirPtr,
+                                Map<String, Integer> postEntriesPtrByMandir,
+                                Set<String> curatedPostIds,
+                                Set<String> viewedPostIdsForUser,
+                                List<Post> curatedPosts) {
+
+        List<Post> mandirPosts = new ArrayList<>();
+        while (mandirPostsTotalCount.get() > 0 && mandirPosts.size() < mandirPostsCount) {
+            Map.Entry<String, List<Post>> entry =
+                    postEntriesByMandir.get(postEntriesByMandirPtr.get());
+
+            Integer entryValuePtr = postEntriesPtrByMandir.get(entry.getKey());
+
+            while (entryValuePtr > 0) {
+                Post post = entry.getValue().get(entry.getValue().size() - entryValuePtr);
+                entryValuePtr--;
+                postEntriesPtrByMandir.put(entry.getKey(), entryValuePtr);
+                mandirPostsTotalCount.decrementAndGet();
+                if (!viewedPostIdsForUser.contains(post.getPostId()) && !curatedPostIds.contains(post.getPostId())) {
+                    // found mandir post to put
+                    mandirPosts.add(post);
+                    break;
+                }
+            }
+
+            postEntriesByMandirPtr.set((postEntriesByMandirPtr.incrementAndGet()) % postEntriesByMandir.size());
+
+        }
+
+        if (!mandirPosts.isEmpty()) {
+            mandirPosts.forEach(post -> curatedPostIds.add(post.getPostId()));
+            curatedPosts.addAll(mandirPosts);
+        }
+    }
+
+    public void addContent(Integer contentPostCount,
+                           AtomicInteger scoredContentVideosPostIdsCount,
+                           List<String> scoredContentVideosPostIds,
+                           Set<String> curatedPostIds,
+                           Set<String> viewedPostIdsForUser,
+                           List<Post> curatedPosts) {
+        List<String> scoredContentPostIds = new ArrayList<>();
+        while (scoredContentPostIds.size() < contentPostCount && scoredContentVideosPostIdsCount.get() > 0) {
+            String postId = scoredContentVideosPostIds.get(scoredContentVideosPostIds.size() -
+                    scoredContentVideosPostIdsCount.get());
+            scoredContentVideosPostIdsCount.decrementAndGet();
+
+            if (!viewedPostIdsForUser.contains(postId) && !curatedPostIds.contains(postId)) {
+                // found scored content post id to put
+                scoredContentPostIds.add(postId);
+            }
+        }
+        if (!scoredContentPostIds.isEmpty()) {
+            curatedPostIds.addAll(scoredContentPostIds);
+            scoredContentPostIds.forEach(scPostId ->
+                    postsDao.getPost(scPostId).ifPresent(curatedPosts::add));
+        }
+    }
 
 
     private void checkAuthorization(String userId) {
