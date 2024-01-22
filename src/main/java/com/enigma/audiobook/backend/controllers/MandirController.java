@@ -1,10 +1,7 @@
 package com.enigma.audiobook.backend.controllers;
 
-import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Mandir;
-import com.enigma.audiobook.backend.models.requests.GodImageUploadReq;
 import com.enigma.audiobook.backend.models.requests.MandirContentUploadReq;
-import com.enigma.audiobook.backend.models.responses.GodInitResponse;
 import com.enigma.audiobook.backend.models.responses.MandirInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;

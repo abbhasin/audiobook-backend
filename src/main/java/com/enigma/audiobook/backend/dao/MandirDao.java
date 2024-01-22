@@ -75,7 +75,7 @@ public class MandirDao extends BaseDao {
 
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
-            if (result.getModifiedCount() <= 0) {
+            if (result.getModifiedCount() <= 0 || result.getUpsertedId() == null) {
                 throw new RuntimeException("unable to update");
             }
 

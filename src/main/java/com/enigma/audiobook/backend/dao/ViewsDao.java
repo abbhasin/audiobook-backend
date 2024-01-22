@@ -62,6 +62,10 @@ public class ViewsDao extends BaseDao {
                 .append("userId", new ObjectId(view.getUserId()));
 
         Bson updates = Updates.combine(
+                Updates.set("postId", new ObjectId(view.getPostId())),
+                Updates.set("userId", new ObjectId(view.getUserId())),
+                Updates.min("createTime", getCurrentTime()),
+                Updates.set("updateTime", getCurrentTime()),
                 Updates.max("viewDurationSec", view.getViewDurationSec()),
                 Updates.max("totalLengthSec", view.getTotalLengthSec())
         );
@@ -85,8 +89,9 @@ public class ViewsDao extends BaseDao {
     public List<View> getViewsForUser(String userId, int limit) {
         MongoCollection<Document> collection = getCollection();
 
+        // from latest to last
         FindIterable<Document> docs = collection.find(eq("userId", new ObjectId(userId)))
-                .sort(ascending("_id"))
+                .sort(descending("updateTime", "_id"))
                 .limit(limit);
 
         List<View> views = new ArrayList<>();
@@ -101,14 +106,16 @@ public class ViewsDao extends BaseDao {
         return views;
     }
 
-    public List<View> getViewsForUserNext(String userId, int limit, String lastViewId) {
+    public List<View> getViewsForUserNext(String userId, int limit, View lastView) {
         MongoCollection<Document> collection = getCollection();
-        Bson filterIdGreater = Filters.gt("_id", lastViewId);
+        // dont need a complex or criteria like the scored content since updateTime for single user would mostly
+        // be unique
+        Bson filterUpdateTimeLesser = Filters.lt("updateTime", lastView.getUpdateTime());
         Bson finalFilter = Filters.and(
                 eq("userId", new ObjectId(userId)),
-                filterIdGreater);
+                filterUpdateTimeLesser);
         FindIterable<Document> docs = collection.find(finalFilter)
-                .sort(ascending("_id"))
+                .sort(descending("updateTime", "_id"))
                 .limit(limit);
 
         List<View> views = new ArrayList<>();

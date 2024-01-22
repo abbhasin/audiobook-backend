@@ -1,6 +1,6 @@
 package com.enigma.audiobook.backend.models;
 
-public enum FollowerType {
+public enum FollowingType {
     GOD,
     MANDIR,
     INFLUENCER;

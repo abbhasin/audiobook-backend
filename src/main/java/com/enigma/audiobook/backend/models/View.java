@@ -1,9 +1,12 @@
 package com.enigma.audiobook.backend.models;
 
+import com.enigma.audiobook.backend.utils.MongoDateConverter;
 import com.enigma.audiobook.backend.utils.ObjectIdDeserializer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Data;
+
+import java.util.Date;
 
 @Data
 public class View {
@@ -16,4 +19,8 @@ public class View {
     String userId;
     Integer viewDurationSec;
     Integer totalLengthSec;
+    @JsonDeserialize(using = MongoDateConverter.class)
+    Date createTime;
+    @JsonDeserialize(using = MongoDateConverter.class)
+    Date updateTime;
 }

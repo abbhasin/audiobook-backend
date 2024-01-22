@@ -1,9 +1,6 @@
 package com.enigma.audiobook.backend.jobs;
 
-import com.enigma.audiobook.backend.dao.NewPostsDao;
-import com.enigma.audiobook.backend.dao.PostsDao;
-import com.enigma.audiobook.backend.dao.ScoredContentDao;
-import com.enigma.audiobook.backend.dao.ViewsDao;
+import com.enigma.audiobook.backend.dao.*;
 import com.enigma.audiobook.backend.models.*;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -21,6 +18,7 @@ public class CuratedFeedHandler implements Runnable {
     ViewsDao viewsDao;
     ScoredContentDao scoredContentDao;
     NewPostsDao newPostsDao;
+    CollectionConfigDao collectionConfigDao;
 
     static final Integer MIN_VIEWS_THRESHOLD_FOR_SCORING = 20;
     static final Integer THIRTY_SEC = 30;
@@ -33,10 +31,14 @@ public class CuratedFeedHandler implements Runnable {
     @Override
     public void run() {
         String scoredContentCollectionSuffix = generateSuffix();
+        String collectionName = ScoredContentDao.getCollectionName(scoredContentCollectionSuffix);
+
         scoredContentDao.initCollectionAndIndexes(scoredContentCollectionSuffix);
 
         addScoredContent(scoredContentCollectionSuffix, PostType.VIDEO, SIXTY_SEC, THIRTY_SEC);
         addScoredContent(scoredContentCollectionSuffix, PostType.AUDIO, FORTY_SEC, TWENTY_SEC);
+
+        collectionConfigDao.updateScoredContentCollectionName(collectionName);
     }
 
     private void addScoredContent(String collectionSuffix,

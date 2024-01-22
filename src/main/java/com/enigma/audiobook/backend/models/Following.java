@@ -14,5 +14,5 @@ public class Following {
     String followeeId;
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String followerUserId;
-    FollowerType followerType;
+    FollowingType followingType;
 }

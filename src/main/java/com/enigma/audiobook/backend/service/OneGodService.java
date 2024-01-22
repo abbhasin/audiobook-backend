@@ -13,7 +13,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
@@ -33,6 +32,7 @@ public class OneGodService {
     private final ScoredContentDao scoredContentDao;
     private final ViewsDao viewsDao;
     private final NewPostsDao newPostsDao;
+    private final CollectionConfigDao collectionConfigDao;
 
     public User createUser() {
         return userRegistrationDao.registerNewUser();
@@ -233,12 +233,15 @@ public class OneGodService {
                 .collect(Collectors.toList());
     }
 
-    public List<CuratedFeedResponse> getCuratedFeed(String userId) {
+    public CuratedFeedResponse getCuratedFeed(CuratedFeedRequest curatedFeedRequest) {
+        String userId = curatedFeedRequest.getUserId();
+        checkUserExists(userId);
+
         List<Following> followingsForUser = followingsDao.getFollowingsForUser(userId);
 
         List<Following> mandirFollowings =
                 followingsForUser.stream()
-                        .filter(f -> f.getFollowerType().equals(FollowerType.MANDIR))
+                        .filter(f -> f.getFollowingType().equals(FollowingType.MANDIR))
                         .toList();
 
         Map<String, List<Post>> lastNMandirFollowingPosts =
@@ -246,11 +249,20 @@ public class OneGodService {
                         .collect(Collectors.toMap(Following::getFolloweeId,
                                 f -> postsDao.getPosts(f.getFolloweeId(), PostAssociationType.MANDIR, 100)));
 
+        Optional<String> scoredCollectionName = collectionConfigDao.getScoredCollectionName();
+
         List<String> scoredContentVideosPostIds =
-                scoredContentDao.getScoredContentSorted("", 1000, PostType.VIDEO)
-                        .stream().map(ScoredContent::getPostId).toList();
+                scoredCollectionName.map(s -> scoredContentDao.getScoredContentSorted(s, 1000, PostType.VIDEO)
+                        .stream().map(ScoredContent::getPostId).toList()).orElse(Collections.emptyList());
+
+        List<String> scoredContentAudioPostIds =
+                scoredCollectionName.map(s -> scoredContentDao.getScoredContentSorted(s, 1000, PostType.AUDIO)
+                        .stream().map(ScoredContent::getPostId).toList()).orElse(Collections.emptyList());
 
         List<String> newVideosPostIds = newPostsDao.getNewPostsByTypeNext(PostType.VIDEO, 100, Optional.empty())
+                .stream().map(NewPost::getPostId).toList();
+
+        List<String> newAudioPostIds = newPostsDao.getNewPostsByTypeNext(PostType.AUDIO, 100, Optional.empty())
                 .stream().map(NewPost::getPostId).toList();
 
         Set<String> viewedPostIdsForUser = new HashSet<>(viewsDao.getViewsForUser(userId, 10000)
@@ -259,6 +271,52 @@ public class OneGodService {
         /**
          * Feed Logic:
          */
+
+        List<Post> curatedPosts = new ArrayList<>();
+        Set<String> curatedPostIds = new HashSet<>();
+
+        addCuratedPosts(lastNMandirFollowingPosts,
+                scoredContentVideosPostIds,
+                newVideosPostIds,
+                scoredContentAudioPostIds,
+                newAudioPostIds,
+                viewedPostIdsForUser,
+                curatedPosts,
+                curatedPostIds);
+        // TODO: We can paginate here over more entries from followed mandir, new posts and scored content
+
+        // fallback to add to curated feed irrespective of viewed or not but not adding duplicated if already in
+        // curated list
+        if (curatedPosts.size() < 100) {
+            addCuratedPosts(lastNMandirFollowingPosts,
+                    scoredContentVideosPostIds,
+                    newVideosPostIds,
+                    scoredContentAudioPostIds,
+                    newAudioPostIds,
+                    Collections.emptySet(),
+                    curatedPosts,
+                    curatedPostIds);
+        }
+
+        CuratedFeedResponse curatedFeedResponse = new CuratedFeedResponse();
+        curatedFeedResponse.setPosts(curatedPosts);
+        return curatedFeedResponse;
+    }
+
+    private void addCuratedPosts(Map<String, List<Post>> lastNMandirFollowingPosts,
+                                 List<String> scoredContentVideosPostIds,
+                                 List<String> newVideosPostIds,
+                                 List<String> scoredContentAudioPostIds,
+                                 List<String> newAudioPostIds,
+                                 Set<String> viewedPostIdsForUser,
+                                 List<Post> curatedPosts,
+                                 Set<String> curatedPostIds) {
+        Integer countOfMandirPostPerIteration = 4;
+        Integer countOfScoredVideoPostsPerIteration = 2;
+        Integer countOfNewVideoPostsPerIteration = 2;
+        Integer countOfScoredAudioPostsPerIteration = 2;
+        Integer countOfNewAudioPostsPerIteration = 2;
+
         List<Map.Entry<String, List<Post>>> postEntriesByMandir =
                 new ArrayList<>(lastNMandirFollowingPosts.entrySet());
         AtomicInteger mandirPostsTotalCount =
@@ -277,17 +335,13 @@ public class OneGodService {
         AtomicInteger scoredContentVideosPostIdsCount = new AtomicInteger(scoredContentVideosPostIds.size());
         AtomicInteger newVideosPostIdsCount = new AtomicInteger(newVideosPostIds.size());
 
-        List<Post> curatedPosts = new ArrayList<>();
-        Set<String> curatedPostIds = new HashSet<>();
+        AtomicInteger scoredContentAudioPostIdsCount = new AtomicInteger(scoredContentAudioPostIds.size());
+        AtomicInteger newAudioPostIdsCount = new AtomicInteger(newAudioPostIds.size());
 
-        Integer countOfMandirPostPerIteration = 4;
-        Integer countOfScoredVideoPostsPerIteration = 2;
-        Integer countOfNewVideoPostsPerIteration = 2;
-        Integer countOfScoredAudioPostsPerIteration = 2;
-
-        while (curatedPostIds.size() < 100 &&
-                (mandirPostsTotalCount.get() != 0 || scoredContentVideosPostIdsCount.get() != 0
-                        || newVideosPostIdsCount.get() != 0)) {
+        while (curatedPosts.size() < 100 &&
+                (mandirPostsTotalCount.get() > 0 ||
+                        scoredContentVideosPostIdsCount.get() > 0 ||
+                        newVideosPostIdsCount.get() > 0)) {
 
             // mandir posts
             addMandirPosts(countOfMandirPostPerIteration,
@@ -299,13 +353,22 @@ public class OneGodService {
                     viewedPostIdsForUser,
                     curatedPosts);
 
-            // scored content posts
+            // scored content video posts
             addContent(countOfScoredVideoPostsPerIteration,
                     scoredContentVideosPostIdsCount,
                     scoredContentVideosPostIds,
                     curatedPostIds,
                     viewedPostIdsForUser,
                     curatedPosts);
+
+            // scored content audio posts
+            addContent(countOfScoredAudioPostsPerIteration,
+                    scoredContentAudioPostIdsCount,
+                    scoredContentAudioPostIds,
+                    curatedPostIds,
+                    viewedPostIdsForUser,
+                    curatedPosts);
+
             // new videos
             addContent(countOfNewVideoPostsPerIteration,
                     newVideosPostIdsCount,
@@ -313,13 +376,19 @@ public class OneGodService {
                     curatedPostIds,
                     viewedPostIdsForUser,
                     curatedPosts);
-        }
 
-        return new ArrayList<>();
+            // new audio
+            addContent(countOfNewAudioPostsPerIteration,
+                    newAudioPostIdsCount,
+                    newAudioPostIds,
+                    curatedPostIds,
+                    viewedPostIdsForUser,
+                    curatedPosts);
+        }
     }
 
     /**
-     * round robin over all following mandirs, adding posts if not viewed or already added toll
+     * round robin over all following mandirs, adding posts if not viewed or already added to
      * mandir posts count for this iteration.
      */
     private void addMandirPosts(Integer mandirPostsCount,
@@ -384,6 +453,25 @@ public class OneGodService {
         }
     }
 
+    public void addFollowing(Following following) {
+        followingsDao.upsertFollowing(following);
+    }
+
+    public void removeFollowing(Following following) {
+        followingsDao.removeFollowing(following);
+    }
+
+    public List<Following> getFollowingsForUser(String userId) {
+        return followingsDao.getFollowingsForUser(userId);
+    }
+
+    public void addViewForUser(View view) {
+        viewsDao.upsertView(view);
+    }
+
+    private boolean checkUserExists(String userId) {
+        return userRegistrationDao.getUser(userId).isPresent();
+    }
 
     private void checkAuthorization(String userId) {
         Optional<User> user = userRegistrationDao.getUser(userId);

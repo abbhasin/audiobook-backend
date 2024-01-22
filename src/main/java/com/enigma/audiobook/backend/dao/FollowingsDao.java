@@ -1,13 +1,9 @@
 package com.enigma.audiobook.backend.dao;
 
-import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Following;
-import com.enigma.audiobook.backend.models.God;
-import com.enigma.audiobook.backend.models.View;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
@@ -62,11 +58,16 @@ public class FollowingsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document()
                 .append("followeeId", new ObjectId(following.getFolloweeId()))
-                .append("followerType", following.getFollowerType())
-                .append("followerUserId", new ObjectId(following.getFollowerUserId()))
-                .append("isDeleted", false);
+                .append("followingType", following.getFollowingType())
+                .append("followerUserId", new ObjectId(following.getFollowerUserId()));
 
-        Bson updates = query.toBsonDocument();
+        Bson updates = Updates.combine(
+                Updates.set("followeeId", new ObjectId(following.getFolloweeId())),
+                Updates.set("followingType", following.getFollowingType()),
+                Updates.set("followerUserId", new ObjectId(following.getFollowerUserId())),
+                Updates.min("createTime", getCurrentTime()),
+                Updates.set("updateTime", getCurrentTime()),
+                Updates.set("isDeleted", false));
 
         UpdateOptions options = new UpdateOptions().upsert(true);
         try {
@@ -88,13 +89,12 @@ public class FollowingsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document()
                 .append("followeeId", new ObjectId(following.getFolloweeId()))
-                .append("followerType", following.getFollowerType())
-                .append("followerUserId", new ObjectId(following.getFollowerUserId()))
-                .append("isDeleted", true);
+                .append("followingType", following.getFollowingType())
+                .append("followerUserId", new ObjectId(following.getFollowerUserId()));
 
-        Bson updates = query.toBsonDocument();
+        Bson updates = Updates.set("isDeleted", true);
 
-        UpdateOptions options = new UpdateOptions().upsert(true);
+        UpdateOptions options = new UpdateOptions().upsert(false);
         try {
 
             UpdateResult result = collection.updateOne(query, updates, options);
@@ -102,7 +102,7 @@ public class FollowingsDao extends BaseDao {
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
             if (result.getModifiedCount() <= 0 && result.getUpsertedId() == null) {
-                throw new RuntimeException("unable to upsert");
+                throw new RuntimeException("unable to update");
             }
         } catch (MongoException e) {
             log.error("Unable to update due to an error", e);

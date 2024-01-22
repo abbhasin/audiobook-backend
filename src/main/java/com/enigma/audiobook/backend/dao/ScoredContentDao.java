@@ -141,7 +141,7 @@ public class ScoredContentDao extends BaseDao {
         return db.getCollection(getCollectionName(suffix));
     }
 
-    private String getCollectionName(String suffix) {
+    public static String getCollectionName(String suffix) {
         return String.format(SCORED_CONTENT_COLLECTION_FORMAT, suffix);
     }
 }
