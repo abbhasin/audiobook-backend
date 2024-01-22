@@ -30,7 +30,5 @@ public class FollowingsController {
     public List<Following> removeFollowing(@PathVariable("userId") String userId) {
         return oneGodService.getFollowingsForUser(userId);
     }
-
-
->>>>>>> 73953ad (z)
+    
 }
