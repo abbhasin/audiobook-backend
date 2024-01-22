@@ -4,6 +4,7 @@ import com.enigma.audiobook.backend.dao.*;
 import com.enigma.audiobook.backend.models.*;
 import com.enigma.audiobook.backend.models.requests.*;
 import com.enigma.audiobook.backend.models.responses.*;
+import com.google.common.base.Preconditions;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
@@ -469,8 +470,8 @@ public class OneGodService {
         viewsDao.upsertView(view);
     }
 
-    private boolean checkUserExists(String userId) {
-        return userRegistrationDao.getUser(userId).isPresent();
+    private void checkUserExists(String userId) {
+        Preconditions.checkState(userRegistrationDao.getUser(userId).isPresent());
     }
 
     private void checkAuthorization(String userId) {

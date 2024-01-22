@@ -48,7 +48,8 @@ public class NewPostsDao extends BaseDao {
 
         Bson updates = Updates.combine(
                 Updates.set("postId", new ObjectId(newPost.getPostId())),
-                Updates.set("postType", newPost.getPostType().name())
+                Updates.set("postType", newPost.getPostType().name()),
+                Updates.set("updateTime", getCurrentTime())
         );
 
         UpdateOptions options = new UpdateOptions().upsert(true);
