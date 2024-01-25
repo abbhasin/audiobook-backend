@@ -23,10 +23,11 @@ public class S3UploadHandler {
         this.s3Proxy = s3Proxy;
     }
 
-    public S3MPUInitiationResponse initiateMultipartUploadRequest(String bucket, String objectKey,
-                                                 Optional<String> contentType,
-                                                 long totalSize,
-                                                 long allowedTotalSize) {
+    public S3MPUInitiationResponse initiateMultipartUploadRequest(String bucket,
+                                                                  String objectKey,
+                                                                  Optional<String> contentType,
+                                                                  long totalSize,
+                                                                  long allowedTotalSize) {
         if (totalSize > allowedTotalSize) {
             S3MPUInitiationResponse response = new S3MPUInitiationResponse();
             response.setRequestStatus(MPURequestStatus.ABORTED);
@@ -114,7 +115,15 @@ public class S3UploadHandler {
         response.setTotalNumOfParts(numOfChunks.get());
         response.setPartNumToUrl(partNumToUrl);
 
-        return response;
+        response.setRequestStatus(MPURequestStatus.COMPLETED);
+        response.setAbortedReason(null);
 
+        return response;
+    }
+
+    public void abort(String bucket,
+                      String objectKey,
+                      String uploadId) {
+        s3Proxy.abortMultipartUploadRequest(bucket, objectKey, uploadId);
     }
 }
