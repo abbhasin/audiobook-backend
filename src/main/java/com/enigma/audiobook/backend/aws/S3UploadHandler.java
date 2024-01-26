@@ -100,7 +100,7 @@ public class S3UploadHandler {
         }
 
         Map<Integer, String> partNumToUrl =
-                IntStream.range(1, (int) numOfChunks.get())
+                IntStream.range(1, (int) numOfChunks.get() + 1) // exclusive upper bound
                         .mapToObj(partNum -> {
                                     long contentLength = (partNum != numOfChunks.get()) ? chunkSize : lastChunkSize;
                                     String url =

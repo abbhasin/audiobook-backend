@@ -3,6 +3,7 @@ package com.enigma.audiobook.backend.aws;
 import com.enigma.audiobook.backend.aws.models.S3MPUCompletedPart;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -23,9 +24,9 @@ public class S3Proxy {
     private final S3Presigner s3Presigner;
 
     public S3Proxy() {
-        this.s3Client = S3Client.builder()
+        this.s3Client = S3Client.builder().region(Region.AP_SOUTH_1)
                 .build();
-        this.s3Presigner = S3Presigner.create();
+        this.s3Presigner = S3Presigner.builder().region(Region.AP_SOUTH_1).build();
     }
 
 
@@ -66,6 +67,7 @@ public class S3Proxy {
         CreateMultipartUploadResponse response =
                 s3Client.createMultipartUpload(createMultipartUploadRequestBuilder.build());
         String uploadId = response.uploadId();
+        log.info("multi part upload create:" + response);
         log.info("multipart upload s3 created, bucket:{}, key:{}, uploadId:{}",
                 bucket, objectKey, uploadId);
         return uploadId;

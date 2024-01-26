@@ -5,6 +5,7 @@ import com.enigma.audiobook.backend.aws.models.*;
 import com.enigma.audiobook.backend.models.Darshan;
 import com.enigma.audiobook.backend.models.responses.DarshanInitResponse;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.math3.util.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +18,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
+@Slf4j
 public class UploadController {
 
     @Autowired
@@ -26,13 +28,14 @@ public class UploadController {
     static String key_format = "test-upload/ID-%s/%s";
     static long ONE_MB = 1024 * 1024;
     static long ONE_GB = ONE_MB * 1024;
-    static long allowed_size = 100 * ONE_MB;
-    static long chunk_size = 50 * ONE_GB;
+    static long allowed_size = 500 * ONE_MB;
+    static long chunk_size = 5 * ONE_MB;
 
 
     @PostMapping("/uploads/init")
     @ResponseBody
     public UploadInitRes initUpload(@RequestBody UploadInitReq uploadInitReq) {
+        log.info("upload init request:" + uploadInitReq);
         UploadInitRes initRes = new UploadInitRes();
         initRes.setRequestStatus(MPURequestStatus.COMPLETED);
 
@@ -68,6 +71,7 @@ public class UploadController {
         S3MPUInitiationResponse response =
                 uploadHandler.initiateMultipartUploadRequest(bucket, objectKey, Optional.empty(),
                         uploadFileInitReq.getTotalSize(), allowed_size);
+        log.info("initiation response:" + response);
 
         UploadFileInitRes uploadFileInitRes = new UploadFileInitRes();
         uploadFileInitRes.setObjectKey(objectKey);
@@ -105,6 +109,7 @@ public class UploadController {
     @ResponseBody
     public UploadCompletionRes completeUpload(@RequestBody UploadCompletionReq uploadCompletionReq) {
         UploadCompletionRes res = new UploadCompletionRes();
+        res.setRequestStatus(MPURequestStatus.COMPLETED);
 
         Map<String, UploadFileCompletionRes> fileNameToUploadFileResponse = new HashMap<>();
         for (UploadFileCompletionReq uploadFileCompletionReq : uploadCompletionReq.getUploadFileCompletionReqs()) {
