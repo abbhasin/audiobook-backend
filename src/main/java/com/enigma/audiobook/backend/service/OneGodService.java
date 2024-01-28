@@ -61,15 +61,66 @@ public class OneGodService {
         return userRegistrationDao.getUser(userId).orElse(null);
     }
 
-    public GodInitResponse initGod(God god) {
-        god.setImageUrl(null);
-        god.setContentUploadStatus(ContentUploadStatus.PENDING);
-        God godResponse = godDao.addGod(god);
-        return new GodInitResponse(getGodImageUploadDirS3Url(godResponse.getGodId()), godResponse);
+    public GodInitResponse initGod(GodInitRequest godInitRequest) {
+        String id = godDao.generateId();
+
+        UploadInitReq uploadInitReq = godInitRequest.getUploadInitReq();
+
+        Preconditions.checkState(uploadInitReq != null);
+        String objectKeyFormat = getGodImageUploadObjectKeyFormat(id);
+
+        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
+
+        // TODO: add content type
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new GodInitResponse(null, initRes);
+        }
+
+        List<String> urls =
+                initRes.getFileNameToUploadFileResponse()
+                        .values()
+                        .stream()
+                        .map(uploadFileInitRes -> contentUploadUtils.getObjectUrl(uploadFileInitRes.getObjectKey()))
+                        .toList();
+
+        if (urls.isEmpty()) {
+            initRes.setRequestStatus(MPURequestStatus.ABORTED);
+            initRes.setAbortedReason(MPUAbortedReason.URLS_NOT_GENERATED);
+        }
+        Preconditions.checkState(urls.size() <= 10);
+        godInitRequest.getGod().setImageUrl(urls);
+
+        godInitRequest.getGod().setContentUploadStatus(ContentUploadStatus.PENDING);
+        God godResponse = godDao.addGod(godInitRequest.getGod(), id);
+        return new GodInitResponse(godResponse, initRes);
     }
 
-    public God postUploadUpdateGod(GodImageUploadReq req) {
-        return godDao.updateGod(req.getGodId(), req.getImageUrl(), ContentUploadStatus.PROCESSED);
+    public GodCompletionResponse postUploadUpdateGod(GodContentUploadReq godContentUploadReq) {
+        Optional<God> god = godDao.getGod(godContentUploadReq.getGod().getGodId());
+        Preconditions.checkState(god.isPresent());
+        Preconditions.checkState(godContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() <= 10);
+
+        List<String> urls =
+                godContentUploadReq.getUploadCompletionReq()
+                        .getUploadFileCompletionReqs()
+                        .stream()
+                        .map(uploadFileCompletionReq -> contentUploadUtils.getObjectUrl(uploadFileCompletionReq.getObjectKey()))
+                        .sorted()
+                        .toList();
+        List<String> actualUrls = god.get().getImageUrl().stream().sorted().toList();
+        Preconditions.checkState(actualUrls.equals(urls));
+
+        UploadCompletionRes uploadCompletionRes =
+                contentUploadUtils.completeUpload(godContentUploadReq.getUploadCompletionReq());
+
+        if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new GodCompletionResponse(godContentUploadReq.getGod(),
+                    uploadCompletionRes);
+        }
+        God godCompleted = godDao.updateGodStatus(godContentUploadReq.getGod().getGodId(),
+                ContentUploadStatus.PROCESSED);
+        return new GodCompletionResponse(godCompleted, uploadCompletionRes);
     }
 
     public List<God> getGods(int limit) {
@@ -85,16 +136,69 @@ public class OneGodService {
     }
 
 
-    public InfluencerInitResponse initInfluencer(Influencer influencer) {
-        influencer.setImageUrl(null);
-        influencer.setContentUploadStatus(ContentUploadStatus.PENDING);
-        Influencer influencerResp = influencerDao.addInfluencer(influencer);
-        return new InfluencerInitResponse(getInfluencerImageUploadDirS3Url(influencerResp.getUserId()), influencerResp);
+    public InfluencerInitResponse initInfluencer(InfluencerInitRequest influencerInitRequest) {
+        String id = influencerDao.generateId();
+
+        UploadInitReq uploadInitReq = influencerInitRequest.getUploadInitReq();
+
+        Preconditions.checkState(uploadInitReq != null);
+        String objectKeyFormat = getInfluencerImageUploadObjectKeyFormat(id);
+
+        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
+        // TODO: add content type
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new InfluencerInitResponse(null, initRes);
+        }
+
+        List<String> urls =
+                initRes.getFileNameToUploadFileResponse()
+                        .values()
+                        .stream()
+                        .map(uploadFileInitRes -> contentUploadUtils.getObjectUrl(uploadFileInitRes.getObjectKey()))
+                        .toList();
+
+        if (urls.isEmpty()) {
+            initRes.setRequestStatus(MPURequestStatus.ABORTED);
+            initRes.setAbortedReason(MPUAbortedReason.URLS_NOT_GENERATED);
+        }
+
+        Preconditions.checkState(urls.size() <= 10);
+
+        influencerInitRequest.getInfluencer().setImageUrl(urls);
+
+        influencerInitRequest.getInfluencer().setContentUploadStatus(ContentUploadStatus.PENDING);
+        Influencer influencerResp = influencerDao.addInfluencer(influencerInitRequest.getInfluencer(), id);
+
+        return new InfluencerInitResponse(influencerResp, initRes);
     }
 
+    public InfluencerCompletionResponse postUploadUpdateInfluencer(InfluencerContentUploadReq influencerContentUploadReq) {
+        Optional<Influencer> influencer = influencerDao.getInfleuncer(influencerContentUploadReq.getInfluencer().getUserId());
+        Preconditions.checkState(influencer.isPresent());
+        Preconditions.checkState(influencerContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() <= 10);
 
-    public Influencer postUploadUpdateInfluencer(InfluencerImageUploadReq req) {
-        return influencerDao.updateInfluencer(req.getUserId(), req.getImageUrl(), ContentUploadStatus.PROCESSED);
+        List<String> urls =
+                influencerContentUploadReq.getUploadCompletionReq()
+                        .getUploadFileCompletionReqs()
+                        .stream()
+                        .map(uploadFileCompletionReq -> contentUploadUtils.getObjectUrl(uploadFileCompletionReq.getObjectKey()))
+                        .sorted()
+                        .toList();
+        List<String> actualUrls = influencer.get().getImageUrl().stream().sorted().toList();
+        Preconditions.checkState(actualUrls.equals(urls));
+
+        UploadCompletionRes uploadCompletionRes =
+                contentUploadUtils.completeUpload(influencerContentUploadReq.getUploadCompletionReq());
+
+        if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new InfluencerCompletionResponse(influencerContentUploadReq.getInfluencer(),
+                    uploadCompletionRes);
+        }
+
+        Influencer influencerCompleted  = influencerDao.updateInfluencerStatus(influencerContentUploadReq.getInfluencer().getUserId(),
+                ContentUploadStatus.PROCESSED);
+        return new InfluencerCompletionResponse(influencerCompleted, uploadCompletionRes);
     }
 
     public List<Influencer> getInfluencers(int limit) {
@@ -188,18 +292,21 @@ public class OneGodService {
 
         String objectKey = null;
         String url = null;
+        ContentUploadStatus contentUploadStatus = null;
         switch (post.get().getType()) {
             case VIDEO:
                 Preconditions.checkState(postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
                 objectKey = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().get(0).getObjectKey();
                 url = contentUploadUtils.getObjectUrl(objectKey);
                 Preconditions.checkState(post.get().getVideoUrl().equals(url));
+                contentUploadStatus = ContentUploadStatus.RAW_UPLOADED;
                 break;
             case AUDIO:
                 Preconditions.checkState(postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
                 objectKey = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().get(0).getObjectKey();
                 url = contentUploadUtils.getObjectUrl(objectKey);
                 Preconditions.checkState(post.get().getAudioUrl().equals(url));
+                contentUploadStatus = ContentUploadStatus.RAW_UPLOADED;
                 break;
             case IMAGES:
                 int imagesSize = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size();
@@ -211,9 +318,12 @@ public class OneGodService {
                         .sorted()
                         .toList();
 
-                Preconditions.checkState(post.get().getImagesUrl().stream().sorted().equals(urls));
+                List<String> actualUrls = post.get().getImagesUrl().stream().sorted().toList();
+                Preconditions.checkState(actualUrls.equals(urls));
+                contentUploadStatus = ContentUploadStatus.PROCESSED;
                 break;
             case TEXT:
+                contentUploadStatus = ContentUploadStatus.SUCCESS_NO_CONTENT;
                 break;
         }
 
@@ -225,7 +335,7 @@ public class OneGodService {
         }
 
         Post completePost = postsDao.updatePostStatus(postContentUploadReq.getPost().getPostId(),
-                ContentUploadStatus.RAW_UPLOADED);
+                contentUploadStatus);
         return new PostCompletionResponse(completePost, uploadCompletionRes);
     }
 
@@ -245,7 +355,6 @@ public class OneGodService {
     public DarshanInitResponse initDarshan(DarshanInitRequest darshanInitRequest) {
         darshanInitRequest.getDarshan().setVideoUploadStatus(ContentUploadStatus.PENDING);
         String id = darshanDao.generateId();
-
 
         UploadInitReq uploadInitReq = darshanInitRequest.getUploadInitReq();
 
@@ -334,18 +443,70 @@ public class OneGodService {
         return darshans;
     }
 
-    public MandirInitResponse initMandir(Mandir mandir) {
-        mandir.setImageUploadStatus(ContentUploadStatus.PENDING);
-        Mandir mandirRes = mandirDao.initMandir(mandir);
-        return new MandirInitResponse(getMandirImageUploadDirS3Url(mandirRes.getMandirId()),
-                mandirRes);
+    public MandirInitResponse initMandir(MandirInitRequest mandirInitRequest) {
+        String id = influencerDao.generateId();
+
+        UploadInitReq uploadInitReq = mandirInitRequest.getUploadInitReq();
+
+        Preconditions.checkState(uploadInitReq != null);
+        String objectKeyFormat = getInfluencerImageUploadObjectKeyFormat(id);
+
+        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
+        // TODO: add content type
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new MandirInitResponse(null, initRes);
+        }
+
+        List<String> urls =
+                initRes.getFileNameToUploadFileResponse()
+                        .values()
+                        .stream()
+                        .map(uploadFileInitRes -> contentUploadUtils.getObjectUrl(uploadFileInitRes.getObjectKey()))
+                        .toList();
+
+        if (urls.isEmpty()) {
+            initRes.setRequestStatus(MPURequestStatus.ABORTED);
+            initRes.setAbortedReason(MPUAbortedReason.URLS_NOT_GENERATED);
+        }
+
+        Preconditions.checkState(urls.size() <= 10);
+
+        mandirInitRequest.getMandir().setImageUrl(urls);
+
+        mandirInitRequest.getMandir().setContentUploadStatus(ContentUploadStatus.PENDING);
+
+        Mandir mandirRes = mandirDao.initMandir(mandirInitRequest.getMandir(), id);
+        return new MandirInitResponse(mandirRes, initRes);
     }
 
 
-    public Mandir postUploadUpdateMandir(MandirContentUploadReq mandirContentUploadReq) {
-        return mandirDao.updateMandir(mandirContentUploadReq.getMandirId(),
-                mandirContentUploadReq.getImageUrl(),
-                mandirContentUploadReq.getStatus());
+    public MandirCompletionResponse postUploadUpdateMandir(MandirContentUploadReq mandirContentUploadReq) {
+        Optional<Mandir> mandir = mandirDao.getMandir(mandirContentUploadReq.getMandir().getMandirId());
+        Preconditions.checkState(mandir.isPresent());
+        Preconditions.checkState(mandirContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() <= 10);
+
+        List<String> urls =
+                mandirContentUploadReq.getUploadCompletionReq()
+                        .getUploadFileCompletionReqs()
+                        .stream()
+                        .map(uploadFileCompletionReq -> contentUploadUtils.getObjectUrl(uploadFileCompletionReq.getObjectKey()))
+                        .sorted()
+                        .toList();
+        List<String> actualUrls = mandir.get().getImageUrl().stream().sorted().toList();
+        Preconditions.checkState(actualUrls.equals(urls));
+
+        UploadCompletionRes uploadCompletionRes =
+                contentUploadUtils.completeUpload(mandirContentUploadReq.getUploadCompletionReq());
+
+        if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new MandirCompletionResponse(mandirContentUploadReq.getMandir(),
+                    uploadCompletionRes);
+        }
+
+        Mandir mandirCompleted = mandirDao.updateMandirStatus(mandirContentUploadReq.getMandir().getMandirId(),
+                ContentUploadStatus.PROCESSED);
+        return new MandirCompletionResponse(mandirCompleted, uploadCompletionRes);
     }
 
     public Mandir getMandir(String mandirId) {

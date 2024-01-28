@@ -5,14 +5,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class Mandir {
     @JsonProperty("_id")
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String mandirId;
     String name;
-    String imageUrl;
-    ContentUploadStatus imageUploadStatus;
+    List<String> imageUrl;
+    ContentUploadStatus contentUploadStatus;
     String description;
     Address address;
     Quality quality;

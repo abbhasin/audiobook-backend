@@ -4,6 +4,7 @@ import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.God;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -36,12 +37,16 @@ public class GodDao extends BaseDao {
         this.database = database;
     }
 
-    public God addGod(God god) {
+    public String generateId() {
+        return new ObjectId().toString();
+    }
+
+    public God addGod(God god, String id) {
         MongoCollection<Document> collection = getCollection();
 
         try {
             Document doc = Document.parse(serde.toJson(god))
-                    .append("_id", new ObjectId())
+                    .append("_id", new ObjectId(id))
                     .append("createTime", getCurrentTime())
                     .append("updateTime", getCurrentTime())
                     .append("isDeleted", false)
@@ -56,7 +61,34 @@ public class GodDao extends BaseDao {
         }
     }
 
-    public God updateGod(String godId, String imageUrl, ContentUploadStatus contentUploadStatus) {
+    public God updateGodStatus(String godId, ContentUploadStatus contentUploadStatus) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(godId));
+
+        Bson updates = Updates.combine(
+                Updates.set("contentUploadStatus", contentUploadStatus.name()),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to associate auth user with a user");
+            }
+
+            return getGod(godId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public God updateGod(String godId, List<String> imageUrl, ContentUploadStatus contentUploadStatus) {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(godId));
 
@@ -88,7 +120,11 @@ public class GodDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "godName", "imageUrl"));
-        FindIterable<Document> docs = collection.find()
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        FindIterable<Document> docs = collection.find(contentFilter)
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
@@ -109,7 +145,13 @@ public class GodDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "godName", "imageUrl"));
-        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastGodId)))
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        Bson filter = Filters.and(gt("_id", new ObjectId(lastGodId)),
+                contentFilter);
+        FindIterable<Document> docs = collection.find(filter)
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
@@ -142,7 +184,7 @@ public class GodDao extends BaseDao {
     public Optional<God> getGodByName(String godName) {
         MongoCollection<Document> collection = getCollection();
 
-        Document doc = collection.find(eq("godName", new ObjectId(godName)))
+        Document doc = collection.find(eq("godName", godName))
                 .first();
         // Prints a message if there are no result documents, or prints the result document as JSON
         if (doc == null) {

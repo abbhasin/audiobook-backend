@@ -51,4 +51,16 @@ public class ObjectStoreMappingUtils {
     public static String getDarshanVideoUploadObjectKeyFormat(String darshanId) {
         return String.format("darshans/video/%s/raw/", darshanId) + "%s";
     }
+
+    public static String getGodImageUploadObjectKeyFormat(String godId) {
+        return String.format("gods/images/%s/raw/", godId) + "%s";
+    }
+
+    public static String getMandirImageUploadObjectKeyFormat(String mandirId) {
+        return String.format("mandir/images/%s/raw/", mandirId) + "%s";
+    }
+
+    public static String getInfluencerImageUploadObjectKeyFormat(String influencerId) {
+        return String.format("influencer/images/%s/raw/", influencerId) + "%s";
+    }
 }

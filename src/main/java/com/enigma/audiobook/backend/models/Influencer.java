@@ -5,13 +5,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class Influencer {
     @JsonProperty("_id")
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String recordId;
     String userId;
-    String imageUrl;
+    List<String> imageUrl;
     String description;
     ContentUploadStatus contentUploadStatus;
 }

@@ -4,7 +4,7 @@ import com.enigma.audiobook.backend.models.Influencer;
 import lombok.Data;
 
 @Data
-public class InfluencerInitResponse {
+public class InfluencerCompletionResponse {
     final Influencer influencer;
-    final UploadInitRes uploadInitRes;
+    final UploadCompletionRes uploadCompletionRes;
 }

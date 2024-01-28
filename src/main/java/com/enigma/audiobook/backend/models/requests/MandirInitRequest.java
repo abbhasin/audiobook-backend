@@ -4,7 +4,7 @@ import com.enigma.audiobook.backend.models.Mandir;
 import lombok.Data;
 
 @Data
-public class MandirContentUploadReq {
+public class MandirInitRequest {
     Mandir mandir;
-    UploadCompletionReq uploadCompletionReq;
+    UploadInitReq uploadInitReq;
 }

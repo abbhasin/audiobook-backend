@@ -5,6 +5,7 @@ import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Mandir;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -37,13 +38,17 @@ public class MandirDao extends BaseDao {
         this.database = database;
     }
 
-    public Mandir initMandir(Mandir mandir) {
+    public String generateId() {
+        return new ObjectId().toString();
+    }
+
+    public Mandir initMandir(Mandir mandir, String id) {
         MongoCollection<Document> collection = getCollection();
         try {
             // Inserts a sample document describing a movie into the collection
             Document doc = Document.parse(serde.toJson(mandir))
-                    .append("_id", new ObjectId())
-                    .append("imageUploadStatus", ContentUploadStatus.PENDING)
+                    .append("_id", new ObjectId(id))
+                    .append("contentUploadStatus", ContentUploadStatus.PENDING)
                     .append("createTime", getCurrentTime())
                     .append("updateTime", getCurrentTime())
                     .append("isDeleted", false);
@@ -58,13 +63,40 @@ public class MandirDao extends BaseDao {
         }
     }
 
-    public Mandir updateMandir(String mandirId, String imageUrl, ContentUploadStatus imageUploadStatus) {
+    public Mandir updateMandirStatus(String mandirId, ContentUploadStatus contentUploadStatus) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(mandirId));
+
+        Bson updates = Updates.combine(
+                Updates.set("contentUploadStatus", contentUploadStatus.name()),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0 || result.getUpsertedId() == null) {
+                throw new RuntimeException("unable to update");
+            }
+
+            return getMandir(mandirId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Mandir updateMandir(String mandirId, List<String> imageUrl, ContentUploadStatus imageUploadStatus) {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(mandirId));
 
         Bson updates = Updates.combine(
                 Updates.set("imageUrl", imageUrl),
-                Updates.set("imageUploadStatus", imageUploadStatus.name()),
+                Updates.set("contentUploadStatus", imageUploadStatus.name()),
                 Updates.set("updateTime", getCurrentTime())
         );
 
@@ -90,12 +122,19 @@ public class MandirDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "imageUrl", "address"));
-        FindIterable<Document> docs = collection.find()
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+
+        FindIterable<Document> docs = collection.find(contentFilter)
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
 
         List<Mandir> mandirs = new ArrayList<>();
+
+
 
         try (MongoCursor<Document> iter = docs.iterator()) {
             while (iter.hasNext()) {
@@ -111,7 +150,13 @@ public class MandirDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "imageUrl", "address"));
-        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastMandirId)))
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        Bson filter = Filters.and(gt("_id", new ObjectId(lastMandirId)),
+                contentFilter);
+        FindIterable<Document> docs = collection.find(filter)
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);

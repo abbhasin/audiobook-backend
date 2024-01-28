@@ -1,7 +1,9 @@
 package com.enigma.audiobook.backend.controllers;
 
 import com.enigma.audiobook.backend.models.Influencer;
-import com.enigma.audiobook.backend.models.requests.InfluencerImageUploadReq;
+import com.enigma.audiobook.backend.models.requests.InfluencerContentUploadReq;
+import com.enigma.audiobook.backend.models.requests.InfluencerInitRequest;
+import com.enigma.audiobook.backend.models.responses.InfluencerCompletionResponse;
 import com.enigma.audiobook.backend.models.responses.InfluencerInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,14 +18,14 @@ public class InfluencerRegController {
 
     @PostMapping("/influencer/initialization")
     @ResponseBody
-    public InfluencerInitResponse initInfluencer(@RequestBody Influencer influencer) {
-        return oneGodService.initInfluencer(influencer);
+    public InfluencerInitResponse initInfluencer(@RequestBody InfluencerInitRequest influencerInitRequest) {
+        return oneGodService.initInfluencer(influencerInitRequest);
     }
 
     @PostMapping("/influencers/update-completion")
     @ResponseBody
-    public Influencer postUploadUpdateInfluencer(@RequestBody InfluencerImageUploadReq influencerImageUploadReq) {
-        return oneGodService.postUploadUpdateInfluencer(influencerImageUploadReq);
+    public InfluencerCompletionResponse postUploadUpdateInfluencer(@RequestBody InfluencerContentUploadReq influencerContentUploadReq) {
+        return oneGodService.postUploadUpdateInfluencer(influencerContentUploadReq);
     }
 
     @GetMapping("/influencers")

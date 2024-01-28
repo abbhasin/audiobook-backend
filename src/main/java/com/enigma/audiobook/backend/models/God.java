@@ -6,6 +6,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class God {
@@ -13,7 +15,7 @@ public class God {
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String godId;
     String godName;
-    String imageUrl;
+    List<String> imageUrl;
     String description;
     ContentUploadStatus contentUploadStatus;
 }

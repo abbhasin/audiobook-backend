@@ -5,6 +5,7 @@ import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Influencer;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -39,12 +40,16 @@ public class InfluencerDao extends BaseDao {
         this.database = database;
     }
 
-    public Influencer addInfluencer(Influencer influencer) {
+    public String generateId() {
+        return new ObjectId().toString();
+    }
+
+    public Influencer addInfluencer(Influencer influencer, String id) {
         MongoCollection<Document> collection = getCollection();
         try {
             // Inserts a sample document describing a movie into the collection
             InsertOneResult result = collection.insertOne(Document.parse(serde.toJson(influencer))
-                    .append("_id", new ObjectId())
+                    .append("_id", new ObjectId(id))
                     .append("userId", new ObjectId(influencer.getUserId()))
                     .append("contentUploadStatus", ContentUploadStatus.PENDING)
                     .append("createTime", getCurrentTime())
@@ -59,12 +64,39 @@ public class InfluencerDao extends BaseDao {
         }
     }
 
-    public Influencer updateInfluencer(String userId, String imageUrl, ContentUploadStatus contentUploadStatus) {
+    public Influencer updateInfluencerStatus(String userId, ContentUploadStatus contentUploadStatus) {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("userId", new ObjectId(userId));
 
         Bson updates = Updates.combine(
-                Updates.set("imageUrl", imageUrl),
+                Updates.set("contentUploadStatus", contentUploadStatus.name()),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to associate auth user with a user");
+            }
+
+            return getInfleuncer(userId).get();
+        } catch (Exception e) {
+            log.error("Unable to update due to an error", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Influencer updateInfluencer(String userId, List<String> imagesUrl, ContentUploadStatus contentUploadStatus) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("userId", new ObjectId(userId));
+
+        Bson updates = Updates.combine(
+                Updates.set("imageUrl", imagesUrl),
                 Updates.set("contentUploadStatus", contentUploadStatus.name()),
                 Updates.set("updateTime", getCurrentTime())
         );
@@ -91,7 +123,11 @@ public class InfluencerDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "userId", "imageUrl"));
-        FindIterable<Document> docs = collection.find()
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        FindIterable<Document> docs = collection.find(contentFilter)
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
@@ -112,7 +148,13 @@ public class InfluencerDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "userId", "imageUrl"));
-        FindIterable<Document> docs = collection.find(gt("_id", new ObjectId(lastInfluencerId)))
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        Bson filter = Filters.and(gt("_id", new ObjectId(lastInfluencerId)),
+                contentFilter);
+        FindIterable<Document> docs = collection.find(filter)
                 .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);

@@ -2,6 +2,8 @@ package com.enigma.audiobook.backend.controllers;
 
 import com.enigma.audiobook.backend.models.Mandir;
 import com.enigma.audiobook.backend.models.requests.MandirContentUploadReq;
+import com.enigma.audiobook.backend.models.requests.MandirInitRequest;
+import com.enigma.audiobook.backend.models.responses.MandirCompletionResponse;
 import com.enigma.audiobook.backend.models.responses.MandirInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,13 +18,13 @@ public class MandirController {
 
     @PostMapping("/mandirs/initialization")
     @ResponseBody
-    public MandirInitResponse initMandir(@RequestBody Mandir mandir) {
-        return oneGodService.initMandir(mandir);
+    public MandirInitResponse initMandir(@RequestBody MandirInitRequest mandirInitRequest) {
+        return oneGodService.initMandir(mandirInitRequest);
     }
 
     @PostMapping("/mandirs/update-completion")
     @ResponseBody
-    public Mandir postUploadUpdateMandir(@RequestBody MandirContentUploadReq mandirContentUploadReq) {
+    public MandirCompletionResponse postUploadUpdateMandir(@RequestBody MandirContentUploadReq mandirContentUploadReq) {
         return oneGodService.postUploadUpdateMandir(mandirContentUploadReq);
     }
 
