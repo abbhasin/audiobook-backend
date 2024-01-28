@@ -72,7 +72,8 @@ public class OneGodService {
         Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
 
         // TODO: add content type
-        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
+                ContentUploadUtils.ContentTypeByExtension.IMAGE);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new GodInitResponse(null, initRes);
         }
@@ -146,7 +147,8 @@ public class OneGodService {
 
         Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
         // TODO: add content type
-        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
+                ContentUploadUtils.ContentTypeByExtension.IMAGE);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new InfluencerInitResponse(null, initRes);
         }
@@ -225,26 +227,30 @@ public class OneGodService {
 
         if (uploadInitReq != null) {
             if (postInitReq.getPost().getType() != PostType.TEXT) {
+                ContentUploadUtils.ContentTypeByExtension contentTypeByExtension = null;
                 String objectKeyFormat = null;
                 switch (postInitReq.getPost().getType()) {
                     case VIDEO:
                         objectKeyFormat = getPostVideoUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
+                        contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.VIDEO;
                         break;
                     case AUDIO:
                         objectKeyFormat = getPostImageUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
+                        contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.AUDIO;
                         break;
                     case IMAGES:
                         objectKeyFormat = getPostAudioUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
+                        contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.IMAGE;
                         break;
                     case TEXT:
                         break;
                 }
 
                 // TODO: add content type
-                initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+                initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat, contentTypeByExtension);
                 if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
                     return new PostInitResponse(null, initRes);
                 }
@@ -362,7 +368,8 @@ public class OneGodService {
         String objectKeyFormat = getDarshanVideoUploadObjectKeyFormat(id);
 
         // TODO: add content type
-        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
+                ContentUploadUtils.ContentTypeByExtension.IMAGE);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new DarshanInitResponse(null, initRes);
         }
@@ -453,7 +460,8 @@ public class OneGodService {
 
         Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
         // TODO: add content type
-        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
+                ContentUploadUtils.ContentTypeByExtension.IMAGE);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new MandirInitResponse(null, initRes);
         }

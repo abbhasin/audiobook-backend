@@ -14,9 +14,9 @@ import com.enigma.audiobook.backend.models.responses.UploadFileCompletionRes;
 import com.enigma.audiobook.backend.models.responses.UploadFileInitRes;
 import com.enigma.audiobook.backend.models.responses.UploadInitRes;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -39,7 +39,8 @@ public class ContentUploadUtils {
         return String.format("%s/%s", bucket_url, objectKey);
     }
 
-    public UploadInitRes initUpload(UploadInitReq uploadInitReq, String keyFormat) {
+    public UploadInitRes initUpload(UploadInitReq uploadInitReq, String keyFormat,
+                                    ContentTypeByExtension contentTypeByExtension) {
         log.info("upload init request:" + uploadInitReq);
         UploadInitRes initRes = new UploadInitRes();
         initRes.setRequestStatus(MPURequestStatus.COMPLETED);
@@ -48,7 +49,8 @@ public class ContentUploadUtils {
         Map<String, UploadFileInitRes> fileNameToUploadFileResponse = new HashMap<>();
 
         for (UploadFileInitReq uploadFileInitReq : uploadInitReq.getUploadFileInitReqs()) {
-            UploadFileInitRes fileInitRes = initFile(uploadFileInitReq, keyFormat);
+            UploadFileInitRes fileInitRes = initFile(uploadFileInitReq, keyFormat,
+                    contentTypeByExtension);
             fileNameToUploadFileResponse.put(uploadFileInitReq.getFileName(), fileInitRes);
 
             if (!fileInitRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
@@ -65,10 +67,11 @@ public class ContentUploadUtils {
 
     public UploadFileInitRes initFile(UploadFileInitReq uploadFileInitReq) {
         String objectKeyFormat = String.format(key_format, UUID.randomUUID().toString(), "%s");
-        return initFile(uploadFileInitReq, objectKeyFormat);
+        return initFile(uploadFileInitReq, objectKeyFormat, ContentTypeByExtension.VIDEO);
     }
 
-    public UploadFileInitRes initFile(UploadFileInitReq uploadFileInitReq, String keyFormat) {
+    public UploadFileInitRes initFile(UploadFileInitReq uploadFileInitReq, String keyFormat,
+                                      ContentTypeByExtension contentTypeByExtension) {
         String fn = uploadFileInitReq.getFileName();
         String prefixFileName = fn.substring(0, fn.lastIndexOf("."));
         String suffixExtension = fn.substring(fn.lastIndexOf(".") + 1);
@@ -76,8 +79,9 @@ public class ContentUploadUtils {
         String encodedFileNamePrefix = new String(Base64.getEncoder().encode(prefixFileName.getBytes(StandardCharsets.UTF_8)));
         String objectKey = String.format(keyFormat, encodedFileNamePrefix) + "." + suffixExtension;
 
+        String contentType = getContentType(suffixExtension, contentTypeByExtension);
         S3MPUInitiationResponse response =
-                uploadHandler.initiateMultipartUploadRequest(bucket, objectKey, Optional.empty(),
+                uploadHandler.initiateMultipartUploadRequest(bucket, objectKey, Optional.of(contentType),
                         uploadFileInitReq.getTotalSize(), allowed_size);
         log.info("initiation response:" + response);
 
@@ -111,6 +115,15 @@ public class ContentUploadUtils {
 
         uploadFileInitRes.setRequestStatus(MPURequestStatus.COMPLETED);
         return uploadFileInitRes;
+    }
+
+    private String getContentType(String suffixExtension, ContentTypeByExtension contentTypeByExtension) {
+        Map<String, String> fileExtensionToS3ContentType = contentTypeByExtension.getContentTypeMapByExtension();
+        if (StringUtils.isEmpty(suffixExtension)) {
+            return fileExtensionToS3ContentType.get("*");
+        }
+        return Optional.ofNullable(fileExtensionToS3ContentType.get(suffixExtension.toLowerCase()))
+                .orElse(fileExtensionToS3ContentType.get("*"));
     }
 
     public void abortAllCompletionReq(UploadCompletionReq uploadCompletionReq) {
@@ -153,5 +166,24 @@ public class ContentUploadUtils {
         UploadFileCompletionRes res = new UploadFileCompletionRes();
         res.setS3MPUCompleteResponse(s3MPUCompleteResponse);
         return res;
+    }
+
+    public enum ContentTypeByExtension {
+        VIDEO(Map.ofEntries(Map.entry("mp4", "video/mp4"), Map.entry("*", "video/mpeg"))),
+        AUDIO(Map.ofEntries(Map.entry("mp3", "audio/mpeg"), Map.entry("*", "audio/mpeg"))),
+        IMAGE(Map.ofEntries(Map.entry("jpeg", "image/jpeg"),
+                Map.entry("jpg", "image/jpeg"),
+                Map.entry("png", "image/png"),
+                Map.entry("*", "image/jpeg")));
+
+        private final Map<String, String> fileExtensionToS3ContentType;
+
+        private ContentTypeByExtension(Map<String, String> fileExtensionToS3ContentType) {
+            this.fileExtensionToS3ContentType = fileExtensionToS3ContentType;
+        }
+
+        public Map<String, String> getContentTypeMapByExtension() {
+            return this.fileExtensionToS3ContentType;
+        }
     }
 }
