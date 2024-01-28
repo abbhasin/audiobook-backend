@@ -13,6 +13,7 @@ import com.enigma.audiobook.backend.models.responses.UploadCompletionRes;
 import com.enigma.audiobook.backend.models.responses.UploadFileCompletionRes;
 import com.enigma.audiobook.backend.models.responses.UploadFileInitRes;
 import com.enigma.audiobook.backend.models.responses.UploadInitRes;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,7 +83,7 @@ public class ContentUploadUtils {
         String contentType = getContentType(suffixExtension, contentTypeByExtension);
         S3MPUInitiationResponse response =
                 uploadHandler.initiateMultipartUploadRequest(bucket, objectKey, Optional.of(contentType),
-                        uploadFileInitReq.getTotalSize(), allowed_size);
+                        uploadFileInitReq.getTotalSize(), contentTypeByExtension.getAllowedContentSize());
         log.info("initiation response:" + response);
 
         UploadFileInitRes uploadFileInitRes = new UploadFileInitRes();
@@ -101,7 +102,7 @@ public class ContentUploadUtils {
         S3MPUPreSignedUrlsResponse preSignedUrlsResponse =
                 uploadHandler.generatePreSignedS3Urls(bucket, objectKey, response.getUploadId(),
                         uploadFileInitReq.getTotalSize(),
-                        chunk_size, allowed_size);
+                        chunk_size, contentTypeByExtension.getAllowedContentSize());
 
         uploadFileInitRes.setS3MPUPreSignedUrlsResponse(preSignedUrlsResponse);
 
@@ -118,7 +119,7 @@ public class ContentUploadUtils {
     }
 
     private String getContentType(String suffixExtension, ContentTypeByExtension contentTypeByExtension) {
-        Map<String, String> fileExtensionToS3ContentType = contentTypeByExtension.getContentTypeMapByExtension();
+        Map<String, String> fileExtensionToS3ContentType = contentTypeByExtension.getFileExtensionToS3ContentType();
         if (StringUtils.isEmpty(suffixExtension)) {
             return fileExtensionToS3ContentType.get("*");
         }
@@ -134,13 +135,14 @@ public class ContentUploadUtils {
         }
     }
 
-    public UploadCompletionRes completeUpload(UploadCompletionReq uploadCompletionReq) {
+    public UploadCompletionRes completeUpload(UploadCompletionReq uploadCompletionReq,
+                                              ContentTypeByExtension contentTypeByExtension) {
         UploadCompletionRes res = new UploadCompletionRes();
         res.setRequestStatus(MPURequestStatus.COMPLETED);
 
         Map<String, UploadFileCompletionRes> fileNameToUploadFileResponse = new HashMap<>();
         for (UploadFileCompletionReq uploadFileCompletionReq : uploadCompletionReq.getUploadFileCompletionReqs()) {
-            UploadFileCompletionRes fileCompletionRes = completeUpload(uploadFileCompletionReq);
+            UploadFileCompletionRes fileCompletionRes = completeUpload(uploadFileCompletionReq, contentTypeByExtension);
             fileNameToUploadFileResponse.put(uploadFileCompletionReq.getFileName(), fileCompletionRes);
 
             if (!fileCompletionRes.getS3MPUCompleteResponse().getState().equals(MPURequestStatus.COMPLETED)) {
@@ -157,33 +159,37 @@ public class ContentUploadUtils {
         return res;
     }
 
-    public UploadFileCompletionRes completeUpload(UploadFileCompletionReq uploadFileCompletionReq) {
+    public UploadFileCompletionRes completeUpload(UploadFileCompletionReq uploadFileCompletionReq,
+                                                  ContentTypeByExtension contentTypeByExtension) {
         S3MPUCompleteResponse s3MPUCompleteResponse = uploadHandler.completeMultipartUploadRequest(bucket,
                 uploadFileCompletionReq.getObjectKey(),
                 uploadFileCompletionReq.getUploadId(),
                 uploadFileCompletionReq.getS3MPUCompletedParts(),
-                allowed_size);
+                contentTypeByExtension.getAllowedContentSize());
         UploadFileCompletionRes res = new UploadFileCompletionRes();
         res.setS3MPUCompleteResponse(s3MPUCompleteResponse);
         return res;
     }
 
+    @Getter
     public enum ContentTypeByExtension {
-        VIDEO(Map.ofEntries(Map.entry("mp4", "video/mp4"), Map.entry("*", "video/mpeg"))),
-        AUDIO(Map.ofEntries(Map.entry("mp3", "audio/mpeg"), Map.entry("*", "audio/mpeg"))),
+        VIDEO(Map.ofEntries(Map.entry("mp4", "video/mp4"), Map.entry("*", "video/mpeg")),
+                2 * ONE_GB),
+        AUDIO(Map.ofEntries(Map.entry("mp3", "audio/mpeg"), Map.entry("*", "audio/mpeg")),
+                50 * ONE_MB),
         IMAGE(Map.ofEntries(Map.entry("jpeg", "image/jpeg"),
                 Map.entry("jpg", "image/jpeg"),
                 Map.entry("png", "image/png"),
-                Map.entry("*", "image/jpeg")));
+                Map.entry("*", "image/jpeg")),
+                5 * ONE_MB);
 
         private final Map<String, String> fileExtensionToS3ContentType;
+        private final long allowedContentSize;
 
-        private ContentTypeByExtension(Map<String, String> fileExtensionToS3ContentType) {
+        ContentTypeByExtension(Map<String, String> fileExtensionToS3ContentType, long allowedContentSize) {
             this.fileExtensionToS3ContentType = fileExtensionToS3ContentType;
+            this.allowedContentSize = allowedContentSize;
         }
 
-        public Map<String, String> getContentTypeMapByExtension() {
-            return this.fileExtensionToS3ContentType;
-        }
     }
 }

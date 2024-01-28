@@ -66,7 +66,8 @@ public class UploadController {
 
         Map<String, UploadFileCompletionRes> fileNameToUploadFileResponse = new HashMap<>();
         for (UploadFileCompletionReq uploadFileCompletionReq : uploadCompletionReq.getUploadFileCompletionReqs()) {
-            UploadFileCompletionRes fileCompletionRes = contentUploadUtils.completeUpload(uploadFileCompletionReq);
+            UploadFileCompletionRes fileCompletionRes = contentUploadUtils.completeUpload(uploadFileCompletionReq,
+                    ContentUploadUtils.ContentTypeByExtension.VIDEO);
             fileNameToUploadFileResponse.put(uploadFileCompletionReq.getFileName(), fileCompletionRes);
 
             if (!fileCompletionRes.getS3MPUCompleteResponse().getState().equals(MPURequestStatus.COMPLETED)) {

@@ -71,7 +71,6 @@ public class OneGodService {
 
         Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
 
-        // TODO: add content type
         UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
                 ContentUploadUtils.ContentTypeByExtension.IMAGE);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
@@ -113,7 +112,8 @@ public class OneGodService {
         Preconditions.checkState(actualUrls.equals(urls));
 
         UploadCompletionRes uploadCompletionRes =
-                contentUploadUtils.completeUpload(godContentUploadReq.getUploadCompletionReq());
+                contentUploadUtils.completeUpload(godContentUploadReq.getUploadCompletionReq(),
+                        ContentUploadUtils.ContentTypeByExtension.IMAGE);
 
         if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new GodCompletionResponse(godContentUploadReq.getGod(),
@@ -146,7 +146,7 @@ public class OneGodService {
         String objectKeyFormat = getInfluencerImageUploadObjectKeyFormat(id);
 
         Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
-        // TODO: add content type
+
         UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
                 ContentUploadUtils.ContentTypeByExtension.IMAGE);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
@@ -191,7 +191,8 @@ public class OneGodService {
         Preconditions.checkState(actualUrls.equals(urls));
 
         UploadCompletionRes uploadCompletionRes =
-                contentUploadUtils.completeUpload(influencerContentUploadReq.getUploadCompletionReq());
+                contentUploadUtils.completeUpload(influencerContentUploadReq.getUploadCompletionReq(),
+                        ContentUploadUtils.ContentTypeByExtension.IMAGE);
 
         if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new InfluencerCompletionResponse(influencerContentUploadReq.getInfluencer(),
@@ -231,16 +232,19 @@ public class OneGodService {
                 String objectKeyFormat = null;
                 switch (postInitReq.getPost().getType()) {
                     case VIDEO:
+                        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() == 1);
                         objectKeyFormat = getPostVideoUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
                         contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.VIDEO;
                         break;
                     case AUDIO:
+                        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() == 1);
                         objectKeyFormat = getPostImageUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
                         contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.AUDIO;
                         break;
                     case IMAGES:
+                        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
                         objectKeyFormat = getPostAudioUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
                         contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.IMAGE;
@@ -249,7 +253,6 @@ public class OneGodService {
                         break;
                 }
 
-                // TODO: add content type
                 initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat, contentTypeByExtension);
                 if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
                     return new PostInitResponse(null, initRes);
@@ -299,6 +302,7 @@ public class OneGodService {
         String objectKey = null;
         String url = null;
         ContentUploadStatus contentUploadStatus = null;
+        ContentUploadUtils.ContentTypeByExtension contentTypeByExtension = null;
         switch (post.get().getType()) {
             case VIDEO:
                 Preconditions.checkState(postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
@@ -306,6 +310,7 @@ public class OneGodService {
                 url = contentUploadUtils.getObjectUrl(objectKey);
                 Preconditions.checkState(post.get().getVideoUrl().equals(url));
                 contentUploadStatus = ContentUploadStatus.RAW_UPLOADED;
+                contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.VIDEO;
                 break;
             case AUDIO:
                 Preconditions.checkState(postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
@@ -313,6 +318,7 @@ public class OneGodService {
                 url = contentUploadUtils.getObjectUrl(objectKey);
                 Preconditions.checkState(post.get().getAudioUrl().equals(url));
                 contentUploadStatus = ContentUploadStatus.RAW_UPLOADED;
+                contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.AUDIO;
                 break;
             case IMAGES:
                 int imagesSize = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size();
@@ -327,6 +333,7 @@ public class OneGodService {
                 List<String> actualUrls = post.get().getImagesUrl().stream().sorted().toList();
                 Preconditions.checkState(actualUrls.equals(urls));
                 contentUploadStatus = ContentUploadStatus.PROCESSED;
+                contentTypeByExtension = ContentUploadUtils.ContentTypeByExtension.IMAGE;
                 break;
             case TEXT:
                 contentUploadStatus = ContentUploadStatus.SUCCESS_NO_CONTENT;
@@ -334,7 +341,8 @@ public class OneGodService {
         }
 
         UploadCompletionRes uploadCompletionRes =
-                contentUploadUtils.completeUpload(postContentUploadReq.getUploadCompletionReq());
+                contentUploadUtils.completeUpload(postContentUploadReq.getUploadCompletionReq(),
+                        contentTypeByExtension);
 
         if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new PostCompletionResponse(postContentUploadReq.getPost(), uploadCompletionRes);
@@ -365,11 +373,11 @@ public class OneGodService {
         UploadInitReq uploadInitReq = darshanInitRequest.getUploadInitReq();
 
         Preconditions.checkState(uploadInitReq != null);
+        Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() == 1);
         String objectKeyFormat = getDarshanVideoUploadObjectKeyFormat(id);
 
-        // TODO: add content type
         UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat,
-                ContentUploadUtils.ContentTypeByExtension.IMAGE);
+                ContentUploadUtils.ContentTypeByExtension.VIDEO);
         if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new DarshanInitResponse(null, initRes);
         }
@@ -388,7 +396,6 @@ public class OneGodService {
         Preconditions.checkState(urls.size() == 1);
         darshanInitRequest.getDarshan().setVideoUrl(urls.get(0));
 
-
         Darshan darshanRes = darshanDao.initDarshan(darshanInitRequest.getDarshan(), id);
         return new DarshanInitResponse(darshanRes, initRes);
     }
@@ -403,7 +410,8 @@ public class OneGodService {
         Preconditions.checkState(darshan.get().getVideoUrl().equals(url));
 
         UploadCompletionRes uploadCompletionRes =
-                contentUploadUtils.completeUpload(darshanContentUploadReq.getUploadCompletionReq());
+                contentUploadUtils.completeUpload(darshanContentUploadReq.getUploadCompletionReq(),
+                        ContentUploadUtils.ContentTypeByExtension.VIDEO);
 
         if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new DarshanCompletionResponse(darshanContentUploadReq.getDarshan(),
@@ -505,7 +513,8 @@ public class OneGodService {
         Preconditions.checkState(actualUrls.equals(urls));
 
         UploadCompletionRes uploadCompletionRes =
-                contentUploadUtils.completeUpload(mandirContentUploadReq.getUploadCompletionReq());
+                contentUploadUtils.completeUpload(mandirContentUploadReq.getUploadCompletionReq(),
+                        ContentUploadUtils.ContentTypeByExtension.IMAGE);
 
         if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new MandirCompletionResponse(mandirContentUploadReq.getMandir(),
