@@ -36,12 +36,15 @@ public class DarshanDao extends BaseDao {
         this.database = database;
     }
 
-    public Darshan initDarshan(Darshan darshan) {
+    public String generateId() {
+        return new ObjectId().toString();
+    }
+    public Darshan initDarshan(Darshan darshan, String darshanId) {
         MongoCollection<Document> collection = getCollection();
         try {
             darshan.setCreateTime(getCurrentTime());
             darshan.setUpdateTime(getCurrentTime());
-            ObjectId id = new ObjectId();
+            ObjectId id = new ObjectId(darshanId);
 
             darshan.setVideoUploadStatus(ContentUploadStatus.PENDING);
 
@@ -56,6 +59,32 @@ public class DarshanDao extends BaseDao {
             return getDarshan(result.getInsertedId().asObjectId().getValue().toString()).get();
         } catch (MongoException e) {
             log.error("Unable to insert into god registration", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Darshan updateDarshanStatus(String darshanId, ContentUploadStatus status) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(darshanId));
+        Bson updates = Updates.combine(
+                Updates.set("videoUploadStatus", status.name())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+
+        try {
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+
+            if (result.getModifiedCount() <= 0) {
+                throw new IllegalStateException("unable to update darshan:" + darshanId);
+            }
+
+            return getDarshan(darshanId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error: ", e);
             throw new RuntimeException(e);
         }
     }

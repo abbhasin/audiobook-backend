@@ -4,7 +4,7 @@ import com.enigma.audiobook.backend.models.Darshan;
 import lombok.Data;
 
 @Data
-public class DarshanContentUploadReq {
+public class DarshanInitRequest {
     Darshan darshan;
-    UploadCompletionReq uploadCompletionReq;
+    UploadInitReq uploadInitReq;
 }

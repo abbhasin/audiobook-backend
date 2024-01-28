@@ -124,22 +124,22 @@ public class OneGodService {
                 String objectKeyFormat = null;
                 switch (postInitReq.getPost().getType()) {
                     case VIDEO:
-                        objectKeyFormat = getPostVideoUploadObjectKeyFormat(postInitReq.getPost().getPostId(),
+                        objectKeyFormat = getPostVideoUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
                         break;
                     case AUDIO:
-                        objectKeyFormat = getPostImageUploadObjectKeyFormat(postInitReq.getPost().getPostId(),
+                        objectKeyFormat = getPostImageUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
                         break;
                     case IMAGES:
-                        objectKeyFormat = getPostAudioUploadObjectKeyFormat(postInitReq.getPost().getPostId(),
+                        objectKeyFormat = getPostAudioUploadObjectKeyFormat(id,
                                 postInitReq.getPost().getFromUserId());
                         break;
                     case TEXT:
                         break;
                 }
 
-
+                // TODO: add content type
                 initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
                 if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
                     return new PostInitResponse(null, initRes);
@@ -242,19 +242,60 @@ public class OneGodService {
         return postsDao.getPostsPaginated(id, associationType, limit, lastPostId);
     }
 
-    public DarshanInitResponse initDarshan(Darshan darshan) {
-        darshan.setVideoUploadStatus(ContentUploadStatus.PENDING);
-        Darshan darshanRes = darshanDao.initDarshan(darshan);
-        return new DarshanInitResponse(getDarshanVideoUploadDirS3Url(darshanRes.getDarshanId()),
-                darshanRes);
+    public DarshanInitResponse initDarshan(DarshanInitRequest darshanInitRequest) {
+        darshanInitRequest.getDarshan().setVideoUploadStatus(ContentUploadStatus.PENDING);
+        String id = darshanDao.generateId();
+
+
+        UploadInitReq uploadInitReq = darshanInitRequest.getUploadInitReq();
+
+        Preconditions.checkState(uploadInitReq != null);
+        String objectKeyFormat = getDarshanVideoUploadObjectKeyFormat(id);
+
+        // TODO: add content type
+        UploadInitRes initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+        if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new DarshanInitResponse(null, initRes);
+        }
+
+        List<String> urls =
+                initRes.getFileNameToUploadFileResponse()
+                        .values()
+                        .stream()
+                        .map(uploadFileInitRes -> contentUploadUtils.getObjectUrl(uploadFileInitRes.getObjectKey()))
+                        .toList();
+
+        if (urls.isEmpty()) {
+            initRes.setRequestStatus(MPURequestStatus.ABORTED);
+            initRes.setAbortedReason(MPUAbortedReason.URLS_NOT_GENERATED);
+        }
+        Preconditions.checkState(urls.size() == 1);
+        darshanInitRequest.getDarshan().setVideoUrl(urls.get(0));
+
+
+        Darshan darshanRes = darshanDao.initDarshan(darshanInitRequest.getDarshan(), id);
+        return new DarshanInitResponse(darshanRes, initRes);
     }
 
+    public DarshanCompletionResponse postUploadUpdateDarshan(DarshanContentUploadReq darshanContentUploadReq) {
+        Optional<Darshan> darshan = darshanDao.getDarshan(darshanContentUploadReq.getDarshan().getDarshanId());
+        Preconditions.checkState(darshan.isPresent());
+        Preconditions.checkState(darshanContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
 
-    public Darshan postUploadUpdateDarshan(DarshanContentUploadReq darshanContentUploadReq) {
-        return darshanDao.updateDarshan(darshanContentUploadReq.getDarshanId(),
-                darshanContentUploadReq.getThumbnailUrl(),
-                darshanContentUploadReq.getVideoUrl(),
-                darshanContentUploadReq.getStatus());
+        String objectKey = darshanContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().get(0).getObjectKey();
+        String url = contentUploadUtils.getObjectUrl(objectKey);
+        Preconditions.checkState(darshan.get().getVideoUrl().equals(url));
+
+        UploadCompletionRes uploadCompletionRes =
+                contentUploadUtils.completeUpload(darshanContentUploadReq.getUploadCompletionReq());
+
+        if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new DarshanCompletionResponse(darshanContentUploadReq.getDarshan(),
+                    uploadCompletionRes);
+        }
+        Darshan darshanCompleted = darshanDao.updateDarshanStatus(darshan.get().getDarshanId(),
+                ContentUploadStatus.RAW_UPLOADED);
+        return new DarshanCompletionResponse(darshanCompleted, uploadCompletionRes);
     }
 
     public List<Darshan> getCuratedDarshans() {

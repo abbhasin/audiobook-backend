@@ -47,4 +47,8 @@ public class ObjectStoreMappingUtils {
     public static String getPostAudioUploadObjectKeyFormat(String postId, String userId) {
         return String.format("posts/audios/user/%s/audio/%s/raw/", userId, postId) + "%s";
     }
+
+    public static String getDarshanVideoUploadObjectKeyFormat(String darshanId) {
+        return String.format("darshans/video/%s/raw/", darshanId) + "%s";
+    }
 }
