@@ -1,21 +1,25 @@
 package com.enigma.audiobook.backend.controllers;
 
 import com.enigma.audiobook.backend.aws.S3UploadHandler;
-import com.enigma.audiobook.backend.aws.models.*;
-import com.enigma.audiobook.backend.models.Darshan;
-import com.enigma.audiobook.backend.models.responses.DarshanInitResponse;
-import lombok.Data;
+import com.enigma.audiobook.backend.aws.models.MPURequestStatus;
+import com.enigma.audiobook.backend.models.requests.UploadCompletionReq;
+import com.enigma.audiobook.backend.models.requests.UploadFileCompletionReq;
+import com.enigma.audiobook.backend.models.requests.UploadFileInitReq;
+import com.enigma.audiobook.backend.models.requests.UploadInitReq;
+import com.enigma.audiobook.backend.models.responses.UploadCompletionRes;
+import com.enigma.audiobook.backend.models.responses.UploadFileCompletionRes;
+import com.enigma.audiobook.backend.models.responses.UploadFileInitRes;
+import com.enigma.audiobook.backend.models.responses.UploadInitRes;
+import com.enigma.audiobook.backend.utils.ContentUploadUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.math3.util.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @Slf4j
@@ -23,14 +27,8 @@ public class UploadController {
 
     @Autowired
     S3UploadHandler uploadHandler;
-
-    static String bucket = "one-god-dev";
-    static String key_format = "test-upload/ID-%s/%s";
-    static long ONE_MB = 1024 * 1024;
-    static long ONE_GB = ONE_MB * 1024;
-    static long allowed_size = 500 * ONE_MB;
-    static long chunk_size = 5 * ONE_MB;
-
+    @Autowired
+    ContentUploadUtils contentUploadUtils;
 
     @PostMapping("/uploads/init")
     @ResponseBody
@@ -43,7 +41,7 @@ public class UploadController {
         Map<String, UploadFileInitRes> fileNameToUploadFileResponse = new HashMap<>();
 
         for (UploadFileInitReq uploadFileInitReq : uploadInitReq.getUploadFileInitReqs()) {
-            UploadFileInitRes fileInitRes = initFile(uploadFileInitReq);
+            UploadFileInitRes fileInitRes = contentUploadUtils.initFile(uploadFileInitReq);
             fileNameToUploadFileResponse.put(uploadFileInitReq.getFileName(), fileInitRes);
 
             if (!fileInitRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
@@ -58,52 +56,7 @@ public class UploadController {
         return initRes;
     }
 
-    private UploadFileInitRes initFile(UploadFileInitReq uploadFileInitReq) {
-        String fn = uploadFileInitReq.getFileName();
-        String prefixFileName = fn.substring(0, fn.lastIndexOf("."));
-        String suffixExtension = fn.substring(fn.lastIndexOf(".") + 1);
 
-        String encodedFileNamePrefix = new String(Base64.getEncoder().encode(prefixFileName.getBytes(StandardCharsets.UTF_8)));
-        String objectKey = String.format(key_format, UUID.randomUUID().toString(),
-                encodedFileNamePrefix)
-                + "." + suffixExtension;
-
-        S3MPUInitiationResponse response =
-                uploadHandler.initiateMultipartUploadRequest(bucket, objectKey, Optional.empty(),
-                        uploadFileInitReq.getTotalSize(), allowed_size);
-        log.info("initiation response:" + response);
-
-        UploadFileInitRes uploadFileInitRes = new UploadFileInitRes();
-        uploadFileInitRes.setObjectKey(objectKey);
-        uploadFileInitRes.setUploadId(response.getUploadId());
-
-
-        if (!response.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
-            uploadFileInitRes.setRequestStatus(response.getRequestStatus());
-            uploadFileInitRes.setAbortedReason(response.getAbortedReason());
-
-            uploadHandler.abort(bucket, objectKey, response.getUploadId());
-            return uploadFileInitRes;
-        }
-
-        S3MPUPreSignedUrlsResponse preSignedUrlsResponse =
-                uploadHandler.generatePreSignedS3Urls(bucket, objectKey, response.getUploadId(),
-                        uploadFileInitReq.getTotalSize(),
-                        chunk_size, allowed_size);
-
-        uploadFileInitRes.setS3MPUPreSignedUrlsResponse(preSignedUrlsResponse);
-
-        if (!preSignedUrlsResponse.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
-            uploadFileInitRes.setRequestStatus(preSignedUrlsResponse.getRequestStatus());
-            uploadFileInitRes.setAbortedReason(preSignedUrlsResponse.getAbortedReason());
-
-            uploadHandler.abort(bucket, objectKey, response.getUploadId());
-            return uploadFileInitRes;
-        }
-
-        uploadFileInitRes.setRequestStatus(MPURequestStatus.COMPLETED);
-        return uploadFileInitRes;
-    }
 
     @PostMapping("/uploads/completion")
     @ResponseBody
@@ -113,12 +66,14 @@ public class UploadController {
 
         Map<String, UploadFileCompletionRes> fileNameToUploadFileResponse = new HashMap<>();
         for (UploadFileCompletionReq uploadFileCompletionReq : uploadCompletionReq.getUploadFileCompletionReqs()) {
-            UploadFileCompletionRes fileCompletionRes = completeUpload(uploadFileCompletionReq);
+            UploadFileCompletionRes fileCompletionRes = contentUploadUtils.completeUpload(uploadFileCompletionReq);
             fileNameToUploadFileResponse.put(uploadFileCompletionReq.getFileName(), fileCompletionRes);
 
             if (!fileCompletionRes.getS3MPUCompleteResponse().getState().equals(MPURequestStatus.COMPLETED)) {
                 res.setRequestStatus(fileCompletionRes.getS3MPUCompleteResponse().getState());
                 res.setAbortedReason(fileCompletionRes.getS3MPUCompleteResponse().getAbortedReason());
+
+                contentUploadUtils.abortAllCompletionReq(uploadCompletionReq);
                 break;
             }
         }
@@ -128,67 +83,5 @@ public class UploadController {
         return res;
     }
 
-    private UploadFileCompletionRes completeUpload(UploadFileCompletionReq uploadFileCompletionReq) {
-        S3MPUCompleteResponse s3MPUCompleteResponse = uploadHandler.completeMultipartUploadRequest(bucket,
-                uploadFileCompletionReq.getObjectKey(),
-                uploadFileCompletionReq.getUploadId(),
-                uploadFileCompletionReq.getS3MPUCompletedParts(),
-                allowed_size);
-        UploadFileCompletionRes res = new UploadFileCompletionRes();
-        res.setS3MPUCompleteResponse(s3MPUCompleteResponse);
-        return res;
-    }
 
-    @Data
-    public static class UploadInitReq {
-        List<UploadFileInitReq> uploadFileInitReqs;
-
-    }
-
-    @Data
-    public static class UploadFileInitReq {
-        String fileName;
-        long totalSize;
-    }
-
-    @Data
-    public static class UploadInitRes {
-        Map<String, UploadFileInitRes> fileNameToUploadFileResponse;
-        MPURequestStatus requestStatus;
-        MPUAbortedReason abortedReason;
-    }
-
-    @Data
-    public static class UploadFileInitRes {
-        String uploadId;
-        String objectKey;
-        MPURequestStatus requestStatus;
-        MPUAbortedReason abortedReason;
-        S3MPUPreSignedUrlsResponse s3MPUPreSignedUrlsResponse;
-    }
-
-    @Data
-    public static class UploadCompletionReq {
-        List<UploadFileCompletionReq> uploadFileCompletionReqs;
-    }
-
-    @Data
-    public static class UploadFileCompletionReq {
-        String fileName;
-        String uploadId;
-        String objectKey;
-        List<S3MPUCompletedPart> s3MPUCompletedParts;
-    }
-
-    @Data
-    public static class UploadCompletionRes {
-        Map<String, UploadFileCompletionRes> fileNameToUploadFileResponse;
-        MPURequestStatus requestStatus;
-        MPUAbortedReason abortedReason;
-    }
-
-    @Data
-    public static class UploadFileCompletionRes {
-        S3MPUCompleteResponse s3MPUCompleteResponse;
-    }
 }

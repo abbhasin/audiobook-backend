@@ -4,6 +4,13 @@ import com.enigma.audiobook.backend.aws.models.MPURequestStatus;
 import com.enigma.audiobook.backend.aws.models.S3MPUCompletedPart;
 import com.enigma.audiobook.backend.aws.models.S3MPUPreSignedUrlsResponse;
 import com.enigma.audiobook.backend.controllers.UploadController;
+import com.enigma.audiobook.backend.models.requests.UploadCompletionReq;
+import com.enigma.audiobook.backend.models.requests.UploadFileCompletionReq;
+import com.enigma.audiobook.backend.models.requests.UploadFileInitReq;
+import com.enigma.audiobook.backend.models.requests.UploadInitReq;
+import com.enigma.audiobook.backend.models.responses.UploadCompletionRes;
+import com.enigma.audiobook.backend.models.responses.UploadFileInitRes;
+import com.enigma.audiobook.backend.models.responses.UploadInitRes;
 import com.enigma.audiobook.backend.proxies.RestClient;
 import com.enigma.audiobook.backend.utils.SerDe;
 import lombok.Data;
@@ -33,7 +40,7 @@ public class S3MPUClientMain {
 
 
         File file = new File(filePath);
-        UploadController.UploadInitRes response = initUpload(file);
+        UploadInitRes response = initUpload(file);
 
         if (!response.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             log.error("upload init request failed:" + response);
@@ -41,17 +48,17 @@ public class S3MPUClientMain {
         }
 
         log.info("upload init response:" + response);
-        Map<String, UploadController.UploadFileInitRes> fileNameToUploadFileResponse =
+        Map<String, UploadFileInitRes> fileNameToUploadFileResponse =
                 response.getFileNameToUploadFileResponse();
 
-        UploadController.UploadFileInitRes fileInitRes = fileNameToUploadFileResponse.get(file.getName());
+        UploadFileInitRes fileInitRes = fileNameToUploadFileResponse.get(file.getName());
         S3MPUPreSignedUrlsResponse s3MPUPreSignedUrlsResponse = fileInitRes.getS3MPUPreSignedUrlsResponse();
 
         List<S3MPUCompletedPart> completedParts = uploadParts(s3MPUPreSignedUrlsResponse, file);
-        UploadController.UploadCompletionReq completionReq = new UploadController.UploadCompletionReq();
+        UploadCompletionReq completionReq = new UploadCompletionReq();
 
-        List<UploadController.UploadFileCompletionReq> uploadFileCompletionReqs = new ArrayList<>();
-        UploadController.UploadFileCompletionReq uploadFileCompletionReq = new UploadController.UploadFileCompletionReq();
+        List<UploadFileCompletionReq> uploadFileCompletionReqs = new ArrayList<>();
+        UploadFileCompletionReq uploadFileCompletionReq = new UploadFileCompletionReq();
         uploadFileCompletionReq.setUploadId(fileInitRes.getUploadId());
         uploadFileCompletionReq.setObjectKey(fileInitRes.getObjectKey());
         uploadFileCompletionReq.setFileName(file.getName());
@@ -60,7 +67,7 @@ public class S3MPUClientMain {
         uploadFileCompletionReqs.add(uploadFileCompletionReq);
         completionReq.setUploadFileCompletionReqs(uploadFileCompletionReqs);
 
-        UploadController.UploadCompletionRes completionRes = completeUpload(completionReq);
+        UploadCompletionRes completionRes = completeUpload(completionReq);
         if (!completionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             log.error("upload completion request failed:" + completionRes);
             return;
@@ -68,14 +75,14 @@ public class S3MPUClientMain {
 
     }
 
-    private static UploadController.UploadCompletionRes completeUpload(UploadController.UploadCompletionReq completionReq) {
+    private static UploadCompletionRes completeUpload(UploadCompletionReq completionReq) {
         String URL_PREFIX = "localhost:8080";
         String URL_PATH_UPLOAD_INIT = "uploads/completion";
 
 
-        UploadController.UploadCompletionRes response =
+        UploadCompletionRes response =
                 restClient.doPost(URL_PREFIX, URL_PATH_UPLOAD_INIT, serDe.toJson(completionReq),
-                        UploadController.UploadCompletionRes.class);
+                        UploadCompletionRes.class);
         return response;
     }
 
@@ -172,22 +179,22 @@ public class S3MPUClientMain {
         }
     }
 
-    private static UploadController.UploadInitRes initUpload(File file) {
+    private static UploadInitRes initUpload(File file) {
         String URL_PREFIX = "localhost:8080";
         String URL_PATH_UPLOAD_INIT = "uploads/init";
 
-        UploadController.UploadInitReq uploadInitReq = new UploadController.UploadInitReq();
-        List<UploadController.UploadFileInitReq> uploadFileInitReqs = new ArrayList<>();
+        UploadInitReq uploadInitReq = new UploadInitReq();
+        List<UploadFileInitReq> uploadFileInitReqs = new ArrayList<>();
 
-        UploadController.UploadFileInitReq uploadFileInitReq = new UploadController.UploadFileInitReq();
+        UploadFileInitReq uploadFileInitReq = new UploadFileInitReq();
         uploadFileInitReq.setFileName(file.getName());
         uploadFileInitReq.setTotalSize(file.length());
 
         uploadFileInitReqs.add(uploadFileInitReq);
         uploadInitReq.setUploadFileInitReqs(uploadFileInitReqs);
 
-        UploadController.UploadInitRes response = restClient.doPost(URL_PREFIX, URL_PATH_UPLOAD_INIT, serDe.toJson(uploadInitReq),
-                UploadController.UploadInitRes.class);
+        UploadInitRes response = restClient.doPost(URL_PREFIX, URL_PATH_UPLOAD_INIT, serDe.toJson(uploadInitReq),
+                UploadInitRes.class);
         return response;
     }
 }

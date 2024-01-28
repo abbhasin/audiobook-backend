@@ -36,12 +36,17 @@ public class PostsDao extends BaseDao {
         this.database = database;
     }
 
-    public Post initPost(Post post) {
+    public String generateId() {
+        ObjectId id = new ObjectId();
+        return id.toString();
+    }
+
+    public Post initPost(Post post, String postId) {
         MongoCollection<Document> collection = getCollection();
         try {
             post.setCreateTime(getCurrentTime());
             post.setUpdateTime(getCurrentTime());
-            ObjectId id = new ObjectId();
+            ObjectId id = new ObjectId(postId);
 
             if (post.getType() != PostType.TEXT) {
                 post.setContentUploadStatus(ContentUploadStatus.PENDING);
@@ -80,6 +85,30 @@ public class PostsDao extends BaseDao {
             return post;
         } catch (MongoException e) {
             log.error("Unable to insert", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Post updatePostStatus(String postId, ContentUploadStatus status) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(postId));
+
+        Bson updates = Updates.set("contentUploadStatus", status.name());
+        UpdateOptions options = new UpdateOptions().upsert(false);
+
+        try {
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+
+            if (result.getModifiedCount() <= 0) {
+                throw new IllegalStateException("unable to modify post for id:" + postId);
+            }
+
+            return getPost(postId).get();
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error: ", e);
             throw new RuntimeException(e);
         }
     }

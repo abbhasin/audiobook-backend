@@ -1,9 +1,12 @@
 package com.enigma.audiobook.backend.service;
 
+import com.enigma.audiobook.backend.aws.models.MPUAbortedReason;
+import com.enigma.audiobook.backend.aws.models.MPURequestStatus;
 import com.enigma.audiobook.backend.dao.*;
 import com.enigma.audiobook.backend.models.*;
 import com.enigma.audiobook.backend.models.requests.*;
 import com.enigma.audiobook.backend.models.responses.*;
+import com.enigma.audiobook.backend.utils.ContentUploadUtils;
 import com.google.common.base.Preconditions;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -34,6 +37,7 @@ public class OneGodService {
     private final ViewsDao viewsDao;
     private final NewPostsDao newPostsDao;
     private final CollectionConfigDao collectionConfigDao;
+    private final ContentUploadUtils contentUploadUtils;
 
     public User createUser() {
         return userRegistrationDao.registerNewUser();
@@ -106,29 +110,123 @@ public class OneGodService {
     }
 
 
-    public PostInitResponse initPosts(Post posts) {
-        checkAuthorization(posts.getFromUserId());
-        if (posts.getType() == null) {
-            posts.setType(PostType.TEXT);
+    public PostInitResponse initPosts(PostInitRequest postInitReq) {
+        checkAuthorization(postInitReq.getPost().getFromUserId());
+        if (postInitReq.getPost().getType() == null) {
+            postInitReq.getPost().setType(PostType.TEXT);
         }
-        Post post = postsDao.initPost(posts);
-        return new PostInitResponse(getPostImageUploadDirS3Url(post.getPostId()),
-                getPostVideoUploadDirS3Url(post.getPostId()),
-                getPostAudioUploadDirS3Url(post.getPostId()),
-                post);
+        String id = postsDao.generateId();
+        UploadInitRes initRes = null;
+        UploadInitReq uploadInitReq = postInitReq.getUploadInitReq();
+
+        if (uploadInitReq != null) {
+            if (postInitReq.getPost().getType() != PostType.TEXT) {
+                String objectKeyFormat = null;
+                switch (postInitReq.getPost().getType()) {
+                    case VIDEO:
+                        objectKeyFormat = getPostVideoUploadObjectKeyFormat(postInitReq.getPost().getPostId(),
+                                postInitReq.getPost().getFromUserId());
+                        break;
+                    case AUDIO:
+                        objectKeyFormat = getPostImageUploadObjectKeyFormat(postInitReq.getPost().getPostId(),
+                                postInitReq.getPost().getFromUserId());
+                        break;
+                    case IMAGES:
+                        objectKeyFormat = getPostAudioUploadObjectKeyFormat(postInitReq.getPost().getPostId(),
+                                postInitReq.getPost().getFromUserId());
+                        break;
+                    case TEXT:
+                        break;
+                }
+
+
+                initRes = contentUploadUtils.initUpload(uploadInitReq, objectKeyFormat);
+                if (!initRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+                    return new PostInitResponse(null, initRes);
+                }
+
+                List<String> urls =
+                        initRes.getFileNameToUploadFileResponse()
+                                .values()
+                                .stream()
+                                .map(uploadFileInitRes -> contentUploadUtils.getObjectUrl(uploadFileInitRes.getObjectKey()))
+                                .toList();
+
+                if (urls.isEmpty()) {
+                    initRes.setRequestStatus(MPURequestStatus.ABORTED);
+                    initRes.setAbortedReason(MPUAbortedReason.URLS_NOT_GENERATED);
+                }
+                switch (postInitReq.getPost().getType()) {
+                    case VIDEO:
+                        Preconditions.checkState(urls.size() == 1);
+                        postInitReq.getPost().setVideoUrl(urls.get(0));
+                        break;
+                    case AUDIO:
+                        Preconditions.checkState(urls.size() == 1);
+                        postInitReq.getPost().setAudioUrl(urls.get(0));
+                        break;
+                    case IMAGES:
+                        Preconditions.checkState(urls.size() <= 10);
+                        postInitReq.getPost().setImagesUrl(urls);
+                        break;
+                    case TEXT:
+                        break;
+                }
+            }
+        }
+
+        Post post = postsDao.initPost(postInitReq.getPost(), id);
+        return new PostInitResponse(post, initRes);
     }
 
 
-    public Post postUploadUpdatePost(PostContentUploadReq postContentUploadReq) {
-        checkAuthorization(postContentUploadReq.getFromUserId());
-        Post post = postsDao.updatePost(postContentUploadReq.getPostId(),
-                postContentUploadReq.getContentUploadStatus(),
-                postContentUploadReq.getPostType(),
-                postContentUploadReq.getThumnailUrl(),
-                postContentUploadReq.getVideoUrl(),
-                postContentUploadReq.getImagesUrl(),
-                postContentUploadReq.getAudioUrl());
-        return post;
+    public PostCompletionResponse postUploadUpdatePost(PostContentUploadReq postContentUploadReq) {
+        checkAuthorization(postContentUploadReq.getPost().getFromUserId());
+        Optional<Post> post = postsDao.getPost(postContentUploadReq.getPost().getPostId());
+        Preconditions.checkState(post.isPresent());
+        Preconditions.checkState(post.get().getType().equals(postContentUploadReq.getPost().getType()));
+
+        String objectKey = null;
+        String url = null;
+        switch (post.get().getType()) {
+            case VIDEO:
+                Preconditions.checkState(postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
+                objectKey = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().get(0).getObjectKey();
+                url = contentUploadUtils.getObjectUrl(objectKey);
+                Preconditions.checkState(post.get().getVideoUrl().equals(url));
+                break;
+            case AUDIO:
+                Preconditions.checkState(postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
+                objectKey = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().get(0).getObjectKey();
+                url = contentUploadUtils.getObjectUrl(objectKey);
+                Preconditions.checkState(post.get().getAudioUrl().equals(url));
+                break;
+            case IMAGES:
+                int imagesSize = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size();
+                Preconditions.checkState(imagesSize <= 10 && imagesSize == post.get().getImagesUrl().size());
+                List<String> urls = postContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs()
+                        .stream()
+                        .map(UploadFileCompletionReq::getObjectKey)
+                        .map(contentUploadUtils::getObjectUrl)
+                        .sorted()
+                        .toList();
+
+                Preconditions.checkState(post.get().getImagesUrl().stream().sorted().equals(urls));
+                break;
+            case TEXT:
+                break;
+        }
+
+        UploadCompletionRes uploadCompletionRes =
+                contentUploadUtils.completeUpload(postContentUploadReq.getUploadCompletionReq());
+
+        if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
+            return new PostCompletionResponse(postContentUploadReq.getPost(), uploadCompletionRes);
+        }
+
+        Post completePost = postsDao.updatePostStatus(postContentUploadReq.getPost().getPostId(),
+                ContentUploadStatus.RAW_UPLOADED);
+        return new PostCompletionResponse(completePost, uploadCompletionRes);
     }
 
     public Post getPost(String postId) {

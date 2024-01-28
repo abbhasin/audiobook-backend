@@ -3,6 +3,8 @@ package com.enigma.audiobook.backend.controllers;
 import com.enigma.audiobook.backend.models.Post;
 import com.enigma.audiobook.backend.models.PostAssociationType;
 import com.enigma.audiobook.backend.models.requests.PostContentUploadReq;
+import com.enigma.audiobook.backend.models.requests.PostInitRequest;
+import com.enigma.audiobook.backend.models.responses.PostCompletionResponse;
 import com.enigma.audiobook.backend.models.responses.PostInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,13 +19,13 @@ public class PostsController {
 
     @PostMapping("/posts/initialization")
     @ResponseBody
-    public PostInitResponse initPost(@RequestBody Post posts) {
-        return oneGodService.initPosts(posts);
+    public PostInitResponse initPost(@RequestBody PostInitRequest postInitReq) {
+        return oneGodService.initPosts(postInitReq);
     }
 
     @PostMapping("/posts/update-completion")
     @ResponseBody
-    public Post postUploadUpdatePost(@RequestBody PostContentUploadReq postContentUploadReq) {
+    public PostCompletionResponse postUploadUpdatePost(@RequestBody PostContentUploadReq postContentUploadReq) {
         return oneGodService.postUploadUpdatePost(postContentUploadReq);
     }
 

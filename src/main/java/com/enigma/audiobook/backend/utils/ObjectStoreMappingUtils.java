@@ -1,5 +1,7 @@
 package com.enigma.audiobook.backend.utils;
 
+import com.enigma.audiobook.backend.models.Post;
+
 public class ObjectStoreMappingUtils {
 
     public static String getInfluencerImageUploadDirS3Url(String influencerUserId) {
@@ -32,5 +34,17 @@ public class ObjectStoreMappingUtils {
 
     public static String getMandirImageUploadDirS3Url(String mandirId) {
         return String.format("s3://one-god-dev/mandirs/images/%s/", mandirId);
+    }
+
+    public static String getPostVideoUploadObjectKeyFormat(String postId, String userId) {
+        return String.format("posts/videos/user/%s/video/%s/raw/", userId, postId) + "%s";
+    }
+
+    public static String getPostImageUploadObjectKeyFormat(String postId, String userId) {
+        return String.format("posts/images/user/%s/image/%s/raw/", userId, postId) + "%s";
+    }
+
+    public static String getPostAudioUploadObjectKeyFormat(String postId, String userId) {
+        return String.format("posts/audios/user/%s/audio/%s/raw/", userId, postId) + "%s";
     }
 }

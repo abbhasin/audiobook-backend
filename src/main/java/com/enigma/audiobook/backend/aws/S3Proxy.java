@@ -61,6 +61,7 @@ public class S3Proxy {
                 = CreateMultipartUploadRequest
                 .builder()
                 .bucket(bucket)
+                .acl(ObjectCannedACL.PUBLIC_READ)
                 .key(objectKey);
         contentType.ifPresent(createMultipartUploadRequestBuilder::contentType);
 

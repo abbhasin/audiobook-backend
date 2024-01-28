@@ -4,7 +4,7 @@ import com.enigma.audiobook.backend.models.Post;
 import lombok.Data;
 
 @Data
-public class PostContentUploadReq {
+public class PostInitRequest {
     Post post;
-    UploadCompletionReq uploadCompletionReq;
+    UploadInitReq uploadInitReq;
 }
