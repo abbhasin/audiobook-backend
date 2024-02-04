@@ -52,6 +52,10 @@ public class ObjectStoreMappingUtils {
         return String.format("posts/videos/user/%s/video/%s/processed/", userId, postId) + "%s";
     }
 
+    public static String getPostVideoThumnailUploadObjectKeyFormatProcessed(String postId, String userId) {
+        return String.format("posts/videos/user/%s/video/%s/processed/", userId, postId) + "%s";
+    }
+
     public static String getPostImageUploadObjectKeyFormatProcessed(String postId, String userId) {
         return String.format("posts/images/user/%s/image/%s/processed/", userId, postId) + "%s";
     }

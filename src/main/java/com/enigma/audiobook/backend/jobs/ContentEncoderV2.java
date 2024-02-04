@@ -25,10 +25,18 @@ public class ContentEncoderV2 {
 
     }
 
+    public static void updateImageContentToDir(String inputFile, String outputFileDir) throws IOException, InterruptedException {
+        updateImageContent(inputFile, getFilePath(inputFile, outputFileDir, "jpg"));
+    }
+
     public static void updateImageContent(String inputFile, String outputFile) throws IOException, InterruptedException {
         // scale=-2:480 maintains the same aspect ration as original video
         String[] cmd = new String[]{"-i", inputFile, "-vf", "scale=-2:480", outputFile};
         updateViaFFMPEG(Arrays.asList(cmd));
+    }
+
+    public static void updateAudioContentToDir(String inputFile, String outputFileDir) throws IOException, InterruptedException {
+        updateAudioContent(inputFile, getHLSFilePath(inputFile, outputFileDir));
     }
 
     public static void updateAudioContent(String inputFile, String outputFile) throws IOException, InterruptedException {
@@ -38,11 +46,7 @@ public class ContentEncoderV2 {
     }
 
     public static void updateVideoContentToDir(String inputFile, String outputFileDir) throws IOException, InterruptedException {
-        File file = new File(inputFile);
-        String outputFileNamePrefix = file.getName().substring(0, file.getName().lastIndexOf("."));
-        String outputFileName = String.format("%s.%s", outputFileNamePrefix, "m3u8");
-        String outputHLSIndexFile = String.format("%s/%s", outputFileDir, outputFileName);
-        updateVideoContent(inputFile, outputHLSIndexFile);
+        updateVideoContent(inputFile, getHLSFilePath(inputFile, outputFileDir));
     }
 
     public static void updateVideoContent(String inputFile, String outputFile) throws IOException, InterruptedException {
@@ -52,7 +56,7 @@ public class ContentEncoderV2 {
         updateViaFFMPEG(Arrays.asList(cmd));
     }
 
-    public static void updateViaFFMPEG(List<String> inputs) throws IOException, InterruptedException {
+    private static void updateViaFFMPEG(List<String> inputs) throws IOException, InterruptedException {
         String ffmpeg = Loader.load(org.bytedeco.ffmpeg.ffmpeg.class);
         List<String> finalInputs = new ArrayList<>();
         finalInputs.add(ffmpeg);
@@ -61,5 +65,15 @@ public class ContentEncoderV2 {
         ProcessBuilder pb = new ProcessBuilder(finalInputs);
 
         pb.inheritIO().start().waitFor();
+    }
+
+    private static String getHLSFilePath(String inputFile, String outputFileDir) {
+        return getFilePath(inputFile, outputFileDir, "m3u8");
+    }
+    private static String getFilePath(String inputFile, String outputFileDir, String suffix) {
+        File file = new File(inputFile);
+        String outputFileNamePrefix = file.getName().substring(0, file.getName().lastIndexOf("."));
+        String outputFileName = String.format("%s.%s", outputFileNamePrefix, suffix);
+        return String.format("%s/%s", outputFileDir, outputFileName);
     }
 }

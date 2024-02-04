@@ -200,4 +200,31 @@ public class S3Proxy {
         GetObjectResponse response = s3Client.getObject(getObjectRequest, Path.of(fileOutputLocation));
     }
 
+    public void deleteObject(String bucket, String objectKey) {
+        DeleteObjectRequest deleteObjectRequest =
+                DeleteObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(objectKey)
+                        .build();
+        DeleteObjectResponse response = s3Client.deleteObject(deleteObjectRequest);
+    }
+
+    public void deleteObject(String s3ObjectUri) {
+        URI uri = URI.create(s3ObjectUri);
+        String objectKey = uri.getPath().substring(1); // remove the prefix '/'
+
+        int firstDotIndex = uri.getAuthority().indexOf(".");
+        String bucket = uri.getAuthority();
+        if (firstDotIndex != -1) {
+            bucket = uri.getAuthority().substring(0, firstDotIndex);
+        }
+
+        DeleteObjectRequest deleteObjectRequest =
+                DeleteObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(objectKey)
+                        .build();
+        DeleteObjectResponse response = s3Client.deleteObject(deleteObjectRequest);
+    }
+
 }
