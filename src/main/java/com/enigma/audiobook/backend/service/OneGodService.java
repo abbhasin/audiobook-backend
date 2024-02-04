@@ -464,7 +464,7 @@ public class OneGodService {
         UploadInitReq uploadInitReq = mandirInitRequest.getUploadInitReq();
 
         Preconditions.checkState(uploadInitReq != null);
-        String objectKeyFormat = getInfluencerImageUploadObjectKeyFormat(id);
+        String objectKeyFormat = getMandirImageUploadObjectKeyFormat(id);
 
         Preconditions.checkState(uploadInitReq.getUploadFileInitReqs().size() <= 10);
         // TODO: add content type

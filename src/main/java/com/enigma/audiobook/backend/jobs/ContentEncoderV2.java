@@ -2,6 +2,7 @@ package com.enigma.audiobook.backend.jobs;
 
 import org.bytedeco.javacpp.Loader;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,26 +25,34 @@ public class ContentEncoderV2 {
 
     }
 
-    private static void updateImageContent(String inputFile, String outputFile) throws IOException, InterruptedException {
+    public static void updateImageContent(String inputFile, String outputFile) throws IOException, InterruptedException {
         // scale=-2:480 maintains the same aspect ration as original video
         String[] cmd = new String[]{"-i", inputFile, "-vf", "scale=-2:480", outputFile};
         updateViaFFMPEG(Arrays.asList(cmd));
     }
 
-    private static void updateAudioContent(String inputFile, String outputFile) throws IOException, InterruptedException {
+    public static void updateAudioContent(String inputFile, String outputFile) throws IOException, InterruptedException {
         String[] cmd = new String[]{"-i", inputFile, "-c:a", "aac", "-b:a", "128k", "-hls_time", "10",
                 "-hls_list_size", "0", outputFile};
         updateViaFFMPEG(Arrays.asList(cmd));
     }
 
-    private static void updateVideoContent(String inputFile, String outputFile) throws IOException, InterruptedException {
+    public static void updateVideoContentToDir(String inputFile, String outputFileDir) throws IOException, InterruptedException {
+        File file = new File(inputFile);
+        String outputFileNamePrefix = file.getName().substring(0, file.getName().lastIndexOf("."));
+        String outputFileName = String.format("%s.%s", outputFileNamePrefix, "m3u8");
+        String outputHLSIndexFile = String.format("%s/%s", outputFileDir, outputFileName);
+        updateVideoContent(inputFile, outputHLSIndexFile);
+    }
+
+    public static void updateVideoContent(String inputFile, String outputFile) throws IOException, InterruptedException {
         // scale=-2:480 maintains the same aspect ration as original video
         String[] cmd = new String[]{"-i", inputFile, "-vf", "scale=-2:480", "-c:v", "h264", "-b:v", "500k",
                 "-c:a", "aac", "-b:a", "128k", "-hls_time", "10", "-hls_list_size", "0", outputFile};
         updateViaFFMPEG(Arrays.asList(cmd));
     }
 
-    private static void updateViaFFMPEG(List<String> inputs) throws IOException, InterruptedException {
+    public static void updateViaFFMPEG(List<String> inputs) throws IOException, InterruptedException {
         String ffmpeg = Loader.load(org.bytedeco.ffmpeg.ffmpeg.class);
         List<String> finalInputs = new ArrayList<>();
         finalInputs.add(ffmpeg);

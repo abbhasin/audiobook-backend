@@ -14,7 +14,11 @@ public class ObjectIdDeserializer extends JsonDeserializer<String> {
     public String deserialize(JsonParser jp, DeserializationContext deserializationContext) throws IOException, JacksonException {
 //        ObjectId objectId = jp.readValueAs(ObjectId.class);
 //        return objectId.toString();
-        JsonNode oid = ((JsonNode)jp.readValueAsTree()).get("$oid");
+        JsonNode node = ((JsonNode)jp.readValueAsTree());
+        if(node.isTextual()) {
+            return node.asText();
+        }
+        JsonNode oid = node.get("$oid");
         return oid.asText();
     }
 }

@@ -29,7 +29,7 @@ public class DarshanDao extends BaseDao {
 
     private final MongoClient mongoClient;
     private final String database;
-    private static final String DARSHAN_REG_COLLECTION = "DarshanReg";
+    public static final String DARSHAN_REG_COLLECTION = "DarshanReg";
 
     public DarshanDao(MongoClient mongoClient, String database) {
         this.mongoClient = mongoClient;

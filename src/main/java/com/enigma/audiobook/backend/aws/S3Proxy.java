@@ -12,7 +12,10 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartReq
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.UploadPartPresignRequest;
 
+import java.io.File;
+import java.net.URI;
 import java.net.URL;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -163,6 +166,38 @@ public class S3Proxy {
                     cp.setSize(part.size());
                     return cp;
                 }).toList();
+    }
+
+    public void putObject(String bucket, String objectKey, File file, Optional<String> contentType) {
+        PutObjectRequest.Builder putObjectRequest =
+                PutObjectRequest.builder()
+                        .acl(ObjectCannedACL.PUBLIC_READ)
+                        .bucket(bucket)
+                        .key(objectKey);
+
+        contentType.ifPresent(putObjectRequest::contentType);
+
+        PutObjectResponse response = s3Client.putObject(putObjectRequest.build(), Path.of(file.toURI()));
+        log.info("added object to bucket:{}, key:{}, eTag:{}", bucket, objectKey, response.eTag());
+    }
+
+    public void getObject(String s3ObjectUri, URI fileOutputLocation) {
+        URI uri = URI.create(s3ObjectUri);
+        String objectKey = uri.getPath().substring(1); // remove the prefix '/'
+
+        int firstDotIndex = uri.getAuthority().indexOf(".");
+        String bucket = uri.getAuthority();
+        if (firstDotIndex != -1) {
+            bucket = uri.getAuthority().substring(0, firstDotIndex);
+        }
+
+        GetObjectRequest getObjectRequest =
+                GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(objectKey)
+                        .build();
+        GetObjectResponse response = s3Client.getObject(getObjectRequest, Path.of(fileOutputLocation));
     }
 
 }

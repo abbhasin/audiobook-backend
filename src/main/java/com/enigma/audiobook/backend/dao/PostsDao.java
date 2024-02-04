@@ -29,7 +29,7 @@ import static com.mongodb.client.model.Sorts.descending;
 public class PostsDao extends BaseDao {
     private final MongoClient mongoClient;
     private final String database;
-    private static final String POSTS_COLLECTION = "Posts";
+    public static final String POSTS_COLLECTION = "Posts";
 
     public PostsDao(MongoClient mongoClient, String database) {
         this.mongoClient = mongoClient;

@@ -29,8 +29,8 @@ public class ContentUploadUtils {
     S3UploadHandler uploadHandler;
 
     static String bucket = "one-god-dev";
-    static String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
-    static String key_format = "test-upload/ID-%s/%s";
+    public static String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
+    public static String key_format = "test-upload/ID-%s/%s";
     static long ONE_MB = 1024 * 1024;
     static long ONE_GB = ONE_MB * 1024;
     static long allowed_size = 500 * ONE_MB;
