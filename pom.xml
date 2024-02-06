@@ -96,19 +96,12 @@
             <artifactId>bom</artifactId>
             <version>2.23.7</version>
             <type>pom</type>
-            <scope>import</scope>
         </dependency>
 
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
             <version>2.23.7</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.humble</groupId>
-            <artifactId>humble-video-all</artifactId>
-            <version>0.3.0</version>
         </dependency>
 
         <dependency>

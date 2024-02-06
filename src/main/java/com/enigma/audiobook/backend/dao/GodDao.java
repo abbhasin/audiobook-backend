@@ -125,7 +125,7 @@ public class GodDao extends BaseDao {
                 Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
         );
         FindIterable<Document> docs = collection.find(contentFilter)
-                .projection(projectionFields)
+//                .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
 
@@ -152,7 +152,7 @@ public class GodDao extends BaseDao {
         Bson filter = Filters.and(gt("_id", new ObjectId(lastGodId)),
                 contentFilter);
         FindIterable<Document> docs = collection.find(filter)
-                .projection(projectionFields)
+//                .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
 

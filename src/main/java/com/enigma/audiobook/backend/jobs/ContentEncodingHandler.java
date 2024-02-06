@@ -3,16 +3,18 @@ package com.enigma.audiobook.backend.jobs;
 import com.enigma.audiobook.backend.models.Darshan;
 import com.enigma.audiobook.backend.models.Post;
 import com.enigma.audiobook.backend.utils.SerDe;
-import com.enigma.audiobook.backend.utils.algo.DarshanContentTransformer;
-import com.enigma.audiobook.backend.utils.algo.PostsContentTransformer;
+import com.enigma.audiobook.backend.jobs.algo.DarshanContentTransformer;
+import com.enigma.audiobook.backend.jobs.algo.PostsContentTransformer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import static com.enigma.audiobook.backend.dao.DarshanDao.DARSHAN_REG_COLLECTION;
 import static com.enigma.audiobook.backend.dao.PostsDao.POSTS_COLLECTION;
 
 @Slf4j
 @RequiredArgsConstructor
+@Component
 public class ContentEncodingHandler {
     private static final SerDe serde = new SerDe();
     static String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";

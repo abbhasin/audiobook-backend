@@ -1,19 +1,20 @@
-package com.enigma.audiobook.backend.utils.algo;
+package com.enigma.audiobook.backend.jobs.algo;
 
 import com.enigma.audiobook.backend.aws.S3Proxy;
 import com.enigma.audiobook.backend.dao.PostsDao;
 import com.enigma.audiobook.backend.jobs.ContentEncoderV2;
 import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Post;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.getPostAudioUploadObjectKeyFormatProcessed;
-import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.getPostVideoUploadObjectKeyFormatProcessed;
+import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
+@Component
 public class PostsContentTransformer extends BaseContentTransformer {
     final PostsDao postsDao;
     Post post;
@@ -37,7 +38,7 @@ public class PostsContentTransformer extends BaseContentTransformer {
                 handleContent(Collections.singletonList(post.getAudioUrl()), outputS3KeyFormat);
                 break;
             case IMAGES:
-                outputS3KeyFormat = getPostAudioUploadObjectKeyFormatProcessed(post.getPostId(), post.getFromUserId());
+                outputS3KeyFormat = getPostImageUploadObjectKeyFormatProcessed(post.getPostId(), post.getFromUserId());
                 handleContent(post.getImagesUrl(), outputS3KeyFormat);
                 break;
             default:

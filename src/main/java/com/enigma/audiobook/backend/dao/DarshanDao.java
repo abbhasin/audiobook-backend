@@ -39,11 +39,10 @@ public class DarshanDao extends BaseDao {
     public String generateId() {
         return new ObjectId().toString();
     }
+
     public Darshan initDarshan(Darshan darshan, String darshanId) {
         MongoCollection<Document> collection = getCollection();
         try {
-            darshan.setCreateTime(getCurrentTime());
-            darshan.setUpdateTime(getCurrentTime());
             ObjectId id = new ObjectId(darshanId);
 
             darshan.setVideoUploadStatus(ContentUploadStatus.PENDING);
@@ -52,7 +51,9 @@ public class DarshanDao extends BaseDao {
             Document doc = Document.parse(serde.toJson(darshan))
                     .append("_id", id)
                     .append("mandirId", new ObjectId(darshan.getMandirId()))
-                    .append("godId", new ObjectId(darshan.getGodId()));
+                    .append("godId", new ObjectId(darshan.getGodId()))
+                    .append("createTime", getCurrentTime())
+                    .append("updateTime", getCurrentTime());
             InsertOneResult result = collection.insertOne(doc);
             // Prints the ID of the inserted document
             log.info("Success! Inserted document id: " + result.getInsertedId());
@@ -67,7 +68,8 @@ public class DarshanDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(darshanId));
         Bson updates = Updates.combine(
-                Updates.set("videoUploadStatus", status.name())
+                Updates.set("videoUploadStatus", status.name()),
+                Updates.set("updateTime", getCurrentTime())
         );
 
         UpdateOptions options = new UpdateOptions().upsert(false);
@@ -95,7 +97,8 @@ public class DarshanDao extends BaseDao {
         Bson updates = Updates.combine(
                 Updates.set("videoUploadStatus", status.name()),
                 Updates.set("thumbnailUrl", thumbnailUrl),
-                Updates.set("videoUrl", videoUrl)
+                Updates.set("videoUrl", videoUrl),
+                Updates.set("updateTime", getCurrentTime())
         );
         UpdateOptions options = new UpdateOptions().upsert(false);
 
@@ -161,7 +164,7 @@ public class DarshanDao extends BaseDao {
                 Filters.eq("godId", new ObjectId(godId)),
                 Filters.eq("videoUploadStatus", status.name()));
 
-        if(excludeMandirIdOpt.isPresent()) {
+        if (excludeMandirIdOpt.isPresent()) {
             filter = Filters.and(Filters.ne("mandirId", new ObjectId(excludeMandirIdOpt.get())),
                     filter);
         }

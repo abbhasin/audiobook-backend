@@ -1,9 +1,11 @@
 package com.enigma.audiobook.backend.models;
 
+import com.enigma.audiobook.backend.utils.DateSerializer;
 import com.enigma.audiobook.backend.utils.MongoDateConverter;
 import com.enigma.audiobook.backend.utils.ObjectIdDeserializer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -19,10 +21,12 @@ public class Darshan {
     @JsonDeserialize(using = ObjectIdDeserializer.class)
     String godId;
     @JsonDeserialize(using = MongoDateConverter.class)
+    @JsonSerialize(using = DateSerializer.class)
     Date createTime;
-    String shortDescription;
     @JsonDeserialize(using = MongoDateConverter.class)
+    @JsonSerialize(using = DateSerializer.class)
     Date updateTime;
+    String shortDescription;
     String thumbnailUrl;
     String videoUrl;
     ContentUploadStatus videoUploadStatus;

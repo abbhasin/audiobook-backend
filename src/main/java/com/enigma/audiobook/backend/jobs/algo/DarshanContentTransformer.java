@@ -1,10 +1,11 @@
-package com.enigma.audiobook.backend.utils.algo;
+package com.enigma.audiobook.backend.jobs.algo;
 
 import com.enigma.audiobook.backend.aws.S3Proxy;
 import com.enigma.audiobook.backend.dao.DarshanDao;
 import com.enigma.audiobook.backend.jobs.ContentEncoderV2;
 import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Darshan;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -12,6 +13,7 @@ import java.util.Optional;
 
 import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.getDarshanVideoUploadObjectKeyFormatProcessed;
 
+@Component
 public class DarshanContentTransformer extends BaseContentTransformer {
     final DarshanDao darshanDao;
     Darshan darshan;

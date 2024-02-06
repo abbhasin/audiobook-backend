@@ -44,8 +44,6 @@ public class PostsDao extends BaseDao {
     public Post initPost(Post post, String postId) {
         MongoCollection<Document> collection = getCollection();
         try {
-            post.setCreateTime(getCurrentTime());
-            post.setUpdateTime(getCurrentTime());
             ObjectId id = new ObjectId(postId);
 
             if (post.getType() != PostType.TEXT) {
@@ -56,7 +54,9 @@ public class PostsDao extends BaseDao {
 
             // Inserts a sample document describing a movie into the collection
             Document doc = Document.parse(serde.toJson(post))
-                    .append("_id", id);
+                    .append("_id", id)
+                    .append("createTime", getCurrentTime())
+                    .append("updateTime", getCurrentTime());
             switch (post.getAssociationType()) {
                 case MANDIR:
                     doc.append("associatedMandirId", new ObjectId(post.getAssociatedMandirId()));
@@ -93,7 +93,10 @@ public class PostsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(postId));
 
-        Bson updates = Updates.set("contentUploadStatus", status.name());
+        Bson updates =
+                Updates.combine(
+                        Updates.set("contentUploadStatus", status.name()),
+                        Updates.set("updateTime", getCurrentTime()));
         UpdateOptions options = new UpdateOptions().upsert(false);
 
         try {
@@ -118,7 +121,9 @@ public class PostsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(postId));
 
-        Bson statusUpdate = Updates.set("contentUploadStatus", status.name());
+        Bson statusUpdate = Updates.combine(
+                Updates.set("contentUploadStatus", status.name()),
+                Updates.set("updateTime", getCurrentTime()));
         Bson updates;
         switch (postType) {
             case VIDEO:

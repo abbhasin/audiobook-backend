@@ -86,7 +86,7 @@ public class S3MPUClientMain {
         return response;
     }
 
-    private static List<S3MPUCompletedPart> uploadParts(S3MPUPreSignedUrlsResponse s3MPUPreSignedUrlsResponse, File file) {
+    public static List<S3MPUCompletedPart> uploadParts(S3MPUPreSignedUrlsResponse s3MPUPreSignedUrlsResponse, File file) {
         long chunkSize = s3MPUPreSignedUrlsResponse.getChunkSize();
         long totalNumOfParts = s3MPUPreSignedUrlsResponse.getTotalNumOfParts();
         Map<Integer, String> partNumToUrl = s3MPUPreSignedUrlsResponse.getPartNumToUrl();

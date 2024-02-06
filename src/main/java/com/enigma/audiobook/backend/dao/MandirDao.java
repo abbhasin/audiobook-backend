@@ -79,7 +79,7 @@ public class MandirDao extends BaseDao {
 
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
-            if (result.getModifiedCount() <= 0 || result.getUpsertedId() == null) {
+            if (result.getModifiedCount() <= 0 && result.getUpsertedId() == null) {
                 throw new RuntimeException("unable to update");
             }
 
@@ -128,7 +128,7 @@ public class MandirDao extends BaseDao {
         );
 
         FindIterable<Document> docs = collection.find(contentFilter)
-                .projection(projectionFields)
+//                .projection(projectionFields)
                 .sort(ascending("_id"))
                 .limit(limit);
 

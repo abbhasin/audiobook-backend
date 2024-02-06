@@ -1,4 +1,4 @@
-package com.enigma.audiobook.backend.utils.algo;
+package com.enigma.audiobook.backend.jobs.algo;
 
 import com.enigma.audiobook.backend.aws.S3Proxy;
 import lombok.AllArgsConstructor;
@@ -17,8 +17,11 @@ import java.util.Optional;
 public abstract class BaseContentTransformer {
     static String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
     static String bucket = "one-god-dev";
-    static String inputAudioLocalFilePathPrefix = "/tmp/one-god-local/input";
-    static String outputAudioLocalFilePathPrefix = "/tmp/one-god-local/output";
+//    static String inputContentLocalFilePathPrefix = "file:///Users/akhil/Downloads/tmp/one-god-local/input";
+//    static String outputContentLocalFilePathPrefix = "file:///Users/akhil/Downloads/tmp/one-god-local/output";
+
+    static String inputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/input";
+    static String outputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/output";
 
     S3Proxy s3Proxy;
 
@@ -30,22 +33,33 @@ public abstract class BaseContentTransformer {
                 URI inputContentURI = URI.create(inputContentUrl);
 
                 // fetch the object to local
-                String inputContentLocalFilePath = String.format(inputAudioLocalFilePathPrefix + "/%s",
+                String inputContentLocalFilePath = String.format(inputContentLocalFilePathPrefixWOScheme + "/%s",
+                        inputContentURI.getPath().substring(1)); // remove prefix '/'
+                log.info("inputContentLocalFilePath:{}", inputContentLocalFilePath);
+                String inputContentLocalFilePathWOScheme = String.format(inputContentLocalFilePathPrefixWOScheme + "/%s",
                         inputContentURI.getPath().substring(1)); // remove prefix '/'
 
-                s3Proxy.getObject(inputContentUrl, URI.create(inputContentLocalFilePath));
+                String inputContentLocalFilePathDir = inputContentLocalFilePathWOScheme.substring(0,
+                        inputContentLocalFilePathWOScheme.lastIndexOf("/"));
+                log.info("inputContentLocalFilePathDir:{}", inputContentLocalFilePathDir);
 
-                String outputDir = String.format(outputAudioLocalFilePathPrefix + "/%s",
+                createDir(inputContentLocalFilePathDir);
+                s3Proxy.getObject(inputContentUrl, new File(inputContentLocalFilePath).toURI());
+
+                String outputDir = String.format(outputContentLocalFilePathPrefixWOScheme + "/%s",
                         inputContentURI.getPath().substring(1, inputContentURI.getPath().lastIndexOf("/"))); // remove prefix '/'
+                log.info("outputDir:{}", outputDir);
+                createDir(outputDir);
 
                 // create HLS files
-                encodeContentToDir(inputContentLocalFilePath, outputDir);
+                encodeContentToDir(inputContentLocalFilePathWOScheme, outputDir);
 
                 // upload to s3
                 File outputDirFile = new File(outputDir);
                 File[] outputFiles = Objects.requireNonNull(outputDirFile.listFiles());
 
                 for (File f : outputFiles) {
+                    log.info("file path:{}, f:{}", f.getAbsolutePath(), f.toURI());
                     String fileName = f.getName();
                     String s3OutputObjectKey = String.format(outputS3KeyFormat, fileName);
                     addToUploadsList(fileName, getObjectUrl(s3OutputObjectKey));
@@ -63,16 +77,26 @@ public abstract class BaseContentTransformer {
             throw new RuntimeException(e);
         } finally {
             // remove staged data
-            removeStagedData(inputAudioLocalFilePathPrefix);
-            removeStagedData(outputAudioLocalFilePathPrefix);
+            removeStagedData(inputContentLocalFilePathPrefixWOScheme);
+            removeStagedData(outputContentLocalFilePathPrefixWOScheme);
         }
+    }
+
+    private void createDir(String dir) {
+        File file = new File(dir);
+        boolean dirCreated = file.mkdirs();
+        log.info("dirCreated:{}, exists:{}", dirCreated, file.exists());
+        if (!file.exists()) {
+            throw new IllegalStateException("unable to create dir:" + dir);
+        }
+
     }
 
     private void removeStagedData(String dir) {
         File f = new File(dir);
         f.deleteOnExit();
         try {
-            FileUtils.deleteDirectory(new File("directory"));
+            FileUtils.deleteDirectory(f);
         } catch (IOException e) {
             log.error("unable to delete dir:" + dir, e);
             // throw new RuntimeException(e);

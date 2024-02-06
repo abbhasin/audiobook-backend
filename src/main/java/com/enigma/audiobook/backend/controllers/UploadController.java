@@ -1,24 +1,23 @@
 package com.enigma.audiobook.backend.controllers;
 
+import com.enigma.audiobook.backend.aws.S3MPUClientMain;
+import com.enigma.audiobook.backend.aws.S3Proxy;
 import com.enigma.audiobook.backend.aws.S3UploadHandler;
 import com.enigma.audiobook.backend.aws.models.MPURequestStatus;
-import com.enigma.audiobook.backend.models.requests.UploadCompletionReq;
-import com.enigma.audiobook.backend.models.requests.UploadFileCompletionReq;
-import com.enigma.audiobook.backend.models.requests.UploadFileInitReq;
-import com.enigma.audiobook.backend.models.requests.UploadInitReq;
-import com.enigma.audiobook.backend.models.responses.UploadCompletionRes;
-import com.enigma.audiobook.backend.models.responses.UploadFileCompletionRes;
-import com.enigma.audiobook.backend.models.responses.UploadFileInitRes;
-import com.enigma.audiobook.backend.models.responses.UploadInitRes;
+import com.enigma.audiobook.backend.aws.models.S3MPUCompletedPart;
+import com.enigma.audiobook.backend.models.requests.*;
+import com.enigma.audiobook.backend.models.responses.*;
 import com.enigma.audiobook.backend.utils.ContentUploadUtils;
+import com.google.common.base.Preconditions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+
+import java.io.File;
+import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -29,6 +28,9 @@ public class UploadController {
     S3UploadHandler uploadHandler;
     @Autowired
     ContentUploadUtils contentUploadUtils;
+
+    @Autowired
+    S3Proxy s3Proxy;
 
     @PostMapping("/uploads/init")
     @ResponseBody
@@ -57,7 +59,6 @@ public class UploadController {
     }
 
 
-
     @PostMapping("/uploads/completion")
     @ResponseBody
     public UploadCompletionRes completeUpload(@RequestBody UploadCompletionReq uploadCompletionReq) {
@@ -82,6 +83,42 @@ public class UploadController {
         res.setFileNameToUploadFileResponse(fileNameToUploadFileResponse);
 
         return res;
+    }
+
+    @PostMapping("/uploads/parts")
+    @ResponseBody
+    public UploadPartsResponse uploadParts(@RequestBody UploadPartsRequest request) {
+        List<S3MPUCompletedPart> completedParts =
+                S3MPUClientMain.uploadParts(request.getS3MPUPreSignedUrlsResponse(), new File(request.getFilePath()));
+        UploadPartsResponse response = new UploadPartsResponse();
+        response.setS3MPUCompletedParts(completedParts);
+        return response;
+    }
+
+    @GetMapping("/uploads/s3-download")
+    public void tryS3Download() {
+        String fileStr = "/Users/akhil/Downloads/tmp/one-god-local/input/posts/videos/user/65a7936792bb9e2f44a1ea47/video/65c25f30b0ba6251a747e6ee/raw/c2hpdmFfcG9vamFfdmlkZW8=.mp4";
+
+        String inputContentLocalFilePathDir = fileStr.substring(0, fileStr.lastIndexOf("/"));
+        log.info("inputContentLocalFilePathDir:{}", inputContentLocalFilePathDir);
+        File dir = new File(inputContentLocalFilePathDir);
+        log.info("dir exists:{}, can write:{}", dir.exists(), dir.canWrite());
+        if (!dir.exists()) {
+            boolean dirCreated = dir.mkdirs();
+            log.info("created dir:{}", dirCreated);
+        }
+
+//        String dirStr2 = "/Users/akhil/Downloads/tmp/one-god-local/input/posts/videos/user/65a7936792bb9e2f44a1ea47/video/65c25f30b0ba6251a747e6ee/raw";
+//        File dir2 = new File(dirStr2);
+//        log.info("dir2 exists:{}", dir2.exists());
+//        if (!dir2.exists()) {
+//            boolean created = dir2.mkdirs();
+//            log.info("created dirs2:{}", created);
+//        }
+
+        s3Proxy.getObject("https://one-god-dev.s3.ap-south-1.amazonaws.com/posts/videos/user/65a7936792bb9e2f44a1ea47/video/65c25f30b0ba6251a747e6ee/raw/c2hpdmFfcG9vamFfdmlkZW8=.mp4",
+                new File(fileStr).toURI());
+
     }
 
 

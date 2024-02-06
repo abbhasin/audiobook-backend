@@ -12,16 +12,17 @@ public class ContentEncoderV2 {
 
     public static void main(String[] args) throws IOException, InterruptedException {
 
-//        String inputFile = "/Users/akhil/Downloads/test/video2/raw/videoplayback.mp4";
-//        String outputFile = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls/out2.m3u8";
+        String inputFile = "/Users/akhil/Downloads/test/video2/raw/videoplayback.mp4";
+        String outputFile = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls2/out2.m3u8";
+        updateVideoContent(inputFile, outputFile);
 //
 //        String inputImg = "/Users/akhil/Downloads/IMG_0728.PNG";
 //        String outputImg = "/Users/akhil/Downloads/IMG_0728.JPG";
 //        updateImageContent(inputImg, outputImg);
 
-        String inputAudio = "/Users/akhil/Downloads/test/audio/raw/town-10169.mp3";
-        String outputAudio = "/Users/akhil/Downloads/test/audio/ID-12345jlnfwe245/hls/town-10169.m3u8";
-        updateAudioContent(inputAudio, outputAudio);
+//        String inputAudio = "/Users/akhil/Downloads/test/audio/raw/town-10169.mp3";
+//        String outputAudio = "/Users/akhil/Downloads/test/audio/ID-12345jlnfwe245/hls/town-10169.m3u8";
+//        updateAudioContent(inputAudio, outputAudio);
 
     }
 

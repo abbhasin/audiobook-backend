@@ -92,7 +92,10 @@ public class FollowingsDao extends BaseDao {
                 .append("followingType", following.getFollowingType())
                 .append("followerUserId", new ObjectId(following.getFollowerUserId()));
 
-        Bson updates = Updates.set("isDeleted", true);
+        Bson updates =
+                Updates.combine(
+                        Updates.set("isDeleted", true),
+                        Updates.set("updateTime", getCurrentTime()));
 
         UpdateOptions options = new UpdateOptions().upsert(false);
         try {

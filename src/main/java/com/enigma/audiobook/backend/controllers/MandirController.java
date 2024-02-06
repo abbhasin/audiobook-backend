@@ -42,7 +42,7 @@ public class MandirController {
         return oneGodService.getMandirsPaginated(limit, lastMandirId);
     }
 
-    @GetMapping("/mandirs/{godId}")
+    @GetMapping("/mandirs/{mandirId}")
     @ResponseBody
     public Mandir getMandir(@PathVariable("mandirId") String mandirId) {
         return oneGodService.getMandir(mandirId);
