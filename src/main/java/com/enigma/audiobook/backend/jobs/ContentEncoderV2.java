@@ -25,9 +25,10 @@ public class ContentEncoderV2 {
         String outputThumbnailFile = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls/thumbnail.jpg";
         String outFile2 = "/Users/akhil/Downloads/test/video2/raw/videoplayback.mp4";
         String outTNFile = "/Users/akhil/Downloads/test/video2/raw/thumbnail.jpg";
-
+        String outputThumbnailDir = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls";
         getContentDurationSec(outFile2);
-        generateThumbnail(outFile2, outputThumbnailFile);
+//        generateThumbnail(outFile2, outputThumbnailFile);
+        generateThumbnailToDir(outFile2, outputThumbnailDir);
 
 //
 //        String inputImg = "/Users/akhil/Downloads/IMG_0728.PNG";
@@ -88,7 +89,7 @@ public class ContentEncoderV2 {
 
         String[] cmd = new String[]{"-ss", startTimeFormatted, "-i", masterFilePath,
                 "-vf", "scale=1280:-1", "-vframes",
-                "2", outputThumbnailFilePath};
+                "1", outputThumbnailFilePath};
         updateViaFFMPEG(Arrays.asList(cmd));
     }
 

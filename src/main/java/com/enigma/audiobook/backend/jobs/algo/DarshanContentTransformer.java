@@ -24,6 +24,7 @@ public class DarshanContentTransformer extends BaseContentTransformer {
     }
 
     public void handleDarshan(Darshan darshan) {
+        this.darshan = darshan;
         String outputS3KeyFormat = getDarshanVideoUploadObjectKeyFormatProcessed(darshan.getDarshanId());
         handleContent(Collections.singletonList(darshan.getVideoUrl()), outputS3KeyFormat);
     }
@@ -40,6 +41,8 @@ public class DarshanContentTransformer extends BaseContentTransformer {
             return Optional.of("application/x-mpegURL");
         } else if (fileName.endsWith("ts")) {
             return Optional.of("video/MP2T");
+        } else if (fileName.endsWith("jpg")) {
+            return Optional.of("image/jpeg");
         }
         return Optional.empty();
     }
