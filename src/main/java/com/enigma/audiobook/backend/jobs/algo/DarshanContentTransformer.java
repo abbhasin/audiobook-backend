@@ -47,6 +47,7 @@ public class DarshanContentTransformer extends BaseContentTransformer {
     @Override
     protected void encodeContentToDir(String inputContentLocalFilePath, String outputDir) throws IOException, InterruptedException, Exception {
         ContentEncoderV2.updateVideoContentToDir(inputContentLocalFilePath, outputDir);
+        ContentEncoderV2.generateThumbnailToDir(inputContentLocalFilePath, outputDir);
     }
 
     @Override

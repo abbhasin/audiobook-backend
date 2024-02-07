@@ -72,6 +72,7 @@ public class PostsContentTransformer extends BaseContentTransformer {
         switch (post.getType()) {
             case VIDEO:
                 ContentEncoderV2.updateVideoContentToDir(inputContentLocalFilePath, outputDir);
+                ContentEncoderV2.generateThumbnailToDir(inputContentLocalFilePath, outputDir);
                 break;
             case AUDIO:
                 ContentEncoderV2.updateAudioContentToDir(inputContentLocalFilePath, outputDir);

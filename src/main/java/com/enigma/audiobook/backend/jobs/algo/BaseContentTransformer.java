@@ -4,10 +4,12 @@ import com.enigma.audiobook.backend.aws.S3Proxy;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.math3.util.Pair;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -57,7 +59,6 @@ public abstract class BaseContentTransformer {
                 // upload to s3
                 File outputDirFile = new File(outputDir);
                 File[] outputFiles = Objects.requireNonNull(outputDirFile.listFiles());
-
                 for (File f : outputFiles) {
                     log.info("file path:{}, f:{}", f.getAbsolutePath(), f.toURI());
                     String fileName = f.getName();
@@ -68,7 +69,6 @@ public abstract class BaseContentTransformer {
                     s3Proxy.putObject(bucket, s3OutputObjectKey, f, contentType);
                 }
             }
-
             // update db
             updateDBEntry();
             // remove from s3
