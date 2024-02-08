@@ -30,7 +30,7 @@ public class CuratedDarshanHandler implements Runnable {
     static {
         darshanCountPerGod.put("Guru Nanak Ji", 3);
         darshanCountPerGod.put("Shiva", 2);
-        darshanCountPerGod.put("Vishnu", 3);
+        darshanCountPerGod.put("Vishnu", 1);
     }
 
     public void updateDarshanCountPerGod(String godName, Integer count) {

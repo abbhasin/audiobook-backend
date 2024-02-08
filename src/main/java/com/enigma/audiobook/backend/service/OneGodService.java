@@ -429,9 +429,9 @@ public class OneGodService {
         Map<String, List<String>> curatedDarshans = curatedDarshan.get().getGodToDarshanIds();
         List<Darshan> darshans = new ArrayList<>();
 
-        Map<String, Integer> godNameToCounter = curatedDarshans.entrySet()
+        Map<String, Integer> godNameToCounter = new TreeMap<>(curatedDarshans.entrySet()
                 .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size())));
 
         while (true) {
             for (Map.Entry<String, Integer> entry : godNameToCounter.entrySet()) {

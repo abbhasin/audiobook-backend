@@ -1,5 +1,6 @@
 package com.enigma.audiobook.backend.controllers;
 
+import com.enigma.audiobook.backend.jobs.CuratedDarshanHandler;
 import com.enigma.audiobook.backend.models.Darshan;
 import com.enigma.audiobook.backend.models.requests.DarshanContentUploadReq;
 import com.enigma.audiobook.backend.models.requests.DarshanInitRequest;
@@ -15,6 +16,8 @@ import java.util.List;
 public class DarshansController {
     @Autowired
     OneGodService oneGodService;
+    @Autowired
+    CuratedDarshanHandler curatedDarshanHandler;
 
     @PostMapping("/darshans/initialization")
     @ResponseBody
@@ -32,5 +35,10 @@ public class DarshansController {
     @ResponseBody
     public List<Darshan> getDarshans() {
         return oneGodService.getCuratedDarshans();
+    }
+
+    @PostMapping("/darshans/curation")
+    public void invokeCurationOfDarshan() {
+        curatedDarshanHandler.run();
     }
 }
