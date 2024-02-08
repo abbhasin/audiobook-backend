@@ -10,6 +10,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @AllArgsConstructor
@@ -20,7 +21,7 @@ public class CuratedFeedHandler implements Runnable {
     NewPostsDao newPostsDao;
     CollectionConfigDao collectionConfigDao;
 
-    static final Integer MIN_VIEWS_THRESHOLD_FOR_SCORING = 20;
+    static final Integer MIN_VIEWS_THRESHOLD_FOR_SCORING = 2;
     static final Integer THIRTY_SEC = 30;
     static final Integer SIXTY_SEC = 60;
 
@@ -33,15 +34,15 @@ public class CuratedFeedHandler implements Runnable {
         String scoredContentCollectionSuffix = generateSuffix();
         String collectionName = ScoredContentDao.getCollectionName(scoredContentCollectionSuffix);
 
-        scoredContentDao.initCollectionAndIndexes(scoredContentCollectionSuffix);
+        scoredContentDao.initCollectionAndIndexes(collectionName);
 
-        addScoredContent(scoredContentCollectionSuffix, PostType.VIDEO, SIXTY_SEC, THIRTY_SEC);
-        addScoredContent(scoredContentCollectionSuffix, PostType.AUDIO, FORTY_SEC, TWENTY_SEC);
+        addScoredContent(collectionName, PostType.VIDEO, SIXTY_SEC, THIRTY_SEC);
+        addScoredContent(collectionName, PostType.AUDIO, FORTY_SEC, TWENTY_SEC);
 
         collectionConfigDao.updateScoredContentCollectionName(collectionName);
     }
 
-    private void addScoredContent(String collectionSuffix,
+    private void addScoredContent(String collectionName,
                                   PostType postType,
                                   int tierOneViewDurationThreshold,
                                   int tierTwoViewDuration) {
@@ -50,6 +51,10 @@ public class CuratedFeedHandler implements Runnable {
         posts.forEach(post -> {
             List<View> viewsForPost = viewsDao.getViewsForPostNext(post.getPostId(), 1000,
                     Optional.empty());
+//            viewsForPost = viewsForPost
+//                    .stream()
+//                    .filter(view -> !view.getUserId().equals(post.getFromUserId()))
+//                    .toList();
 
             if (viewsForPost.size() < MIN_VIEWS_THRESHOLD_FOR_SCORING) {
                 NewPost newPost = new NewPost();
@@ -86,7 +91,7 @@ public class CuratedFeedHandler implements Runnable {
             sc.setPostId(post.getPostId());
             sc.setPostType(postType);
 
-            scoredContentDao.addScoredContent(collectionSuffix, sc);
+            scoredContentDao.addScoredContent(collectionName, sc);
         });
 
     }

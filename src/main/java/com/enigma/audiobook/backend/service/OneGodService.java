@@ -9,6 +9,7 @@ import com.enigma.audiobook.backend.models.responses.*;
 import com.enigma.audiobook.backend.utils.ContentUploadUtils;
 import com.google.common.base.Preconditions;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
 @Service
 @Data
+@Slf4j
 public class OneGodService {
 
     private final UserRegistrationDao userRegistrationDao;
@@ -199,7 +201,7 @@ public class OneGodService {
                     uploadCompletionRes);
         }
 
-        Influencer influencerCompleted  = influencerDao.updateInfluencerStatus(influencerContentUploadReq.getInfluencer().getUserId(),
+        Influencer influencerCompleted = influencerDao.updateInfluencerStatus(influencerContentUploadReq.getInfluencer().getUserId(),
                 ContentUploadStatus.PROCESSED);
         return new InfluencerCompletionResponse(influencerCompleted, uploadCompletionRes);
     }
@@ -572,6 +574,7 @@ public class OneGodService {
         List<String> scoredContentVideosPostIds =
                 scoredCollectionName.map(s -> scoredContentDao.getScoredContentSorted(s, 1000, PostType.VIDEO)
                         .stream().map(ScoredContent::getPostId).toList()).orElse(Collections.emptyList());
+        log.info("scored content videos:{}", scoredContentVideosPostIds);
 
         List<String> scoredContentAudioPostIds =
                 scoredCollectionName.map(s -> scoredContentDao.getScoredContentSorted(s, 1000, PostType.AUDIO)
@@ -585,6 +588,7 @@ public class OneGodService {
 
         Set<String> viewedPostIdsForUser = new HashSet<>(viewsDao.getViewsForUser(userId, 10000)
                 .stream().map(View::getPostId).toList());
+        log.info("viewedPostIdsForUser:{}", viewedPostIdsForUser);
 
         /**
          * Feed Logic:
@@ -659,7 +663,10 @@ public class OneGodService {
         while (curatedPosts.size() < 100 &&
                 (mandirPostsTotalCount.get() > 0 ||
                         scoredContentVideosPostIdsCount.get() > 0 ||
-                        newVideosPostIdsCount.get() > 0)) {
+                        newVideosPostIdsCount.get() > 0 ||
+                        scoredContentAudioPostIdsCount.get() > 0 ||
+                        newAudioPostIdsCount.get() > 0)
+        ) {
 
             // mandir posts
             addMandirPosts(countOfMandirPostPerIteration,

@@ -34,8 +34,8 @@ public class ScoredContentDao extends BaseDao {
         this.database = database;
     }
 
-    public void addBulkScoredContent(String suffix, List<ScoredContent> scoredContents) {
-        MongoCollection<Document> collection = getCollection(suffix);
+    public void addBulkScoredContent(String collectionName, List<ScoredContent> scoredContents) {
+        MongoCollection<Document> collection = getCollectionByName(collectionName);
 
         List<Document> docs = scoredContents.stream()
                 .map(sc -> {
@@ -56,8 +56,8 @@ public class ScoredContentDao extends BaseDao {
         }
     }
 
-    public void addScoredContent(String suffix, ScoredContent scoredContent) {
-        MongoCollection<Document> collection = getCollection(suffix);
+    public void addScoredContent(String collectionName, ScoredContent scoredContent) {
+        MongoCollection<Document> collection = getCollectionByName(collectionName);
 
         Document doc = Document.parse(serde.toJson(scoredContent));
         doc.append("_id", new ObjectId());
@@ -71,8 +71,8 @@ public class ScoredContentDao extends BaseDao {
         }
     }
 
-    public List<ScoredContent> getScoredContentSorted(String suffix, int limit, PostType postType) {
-        MongoCollection<Document> collection = getCollection(suffix);
+    public List<ScoredContent> getScoredContentSorted(String collectionName, int limit, PostType postType) {
+        MongoCollection<Document> collection = getCollectionByName(collectionName);
 
         FindIterable<Document> docs = collection.find(eq("postType", postType.name()))
                 .sort(descending("score", "postId"))
@@ -89,11 +89,11 @@ public class ScoredContentDao extends BaseDao {
         return scoreContent;
     }
 
-    public List<ScoredContent> getScoredContentSortedPaginated(String suffix, int limit,
+    public List<ScoredContent> getScoredContentSortedPaginated(String collectionName, int limit,
                                                                PostType postType,
                                                                ScoredContent lastScoredContent
     ) {
-        MongoCollection<Document> collection = getCollection(suffix);
+        MongoCollection<Document> collection = getCollectionByName(collectionName);
 
         Bson filterScoreLesser = Filters.lt("score", lastScoredContent.getScore());
 
@@ -120,12 +120,11 @@ public class ScoredContentDao extends BaseDao {
         return scoreContent;
     }
 
-    public void initCollectionAndIndexes(String suffix) {
-        String collName = getCollectionName(suffix);
+    public void initCollectionAndIndexes(String collectionName) {
         MongoDatabase db = mongoClient.getDatabase(database);
-        db.createCollection(collName);
+        db.createCollection(collectionName);
 
-        MongoCollection<Document> collection = db.getCollection(collName);
+        MongoCollection<Document> collection = db.getCollection(collectionName);
 
         IndexOptions indexOptions = new IndexOptions()
                 .name("score_and_postId_descending_index")
@@ -135,10 +134,9 @@ public class ScoredContentDao extends BaseDao {
         log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
-
-    private MongoCollection<Document> getCollection(String suffix) {
+    private MongoCollection<Document> getCollectionByName(String collectionName) {
         MongoDatabase db = mongoClient.getDatabase(database);
-        return db.getCollection(getCollectionName(suffix));
+        return db.getCollection(collectionName);
     }
 
     public static String getCollectionName(String suffix) {
