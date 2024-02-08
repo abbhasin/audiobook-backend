@@ -8,5 +8,6 @@ public class Address {
     String locality;
     String city;
     String state;
+    String pincode;
     String country;
 }

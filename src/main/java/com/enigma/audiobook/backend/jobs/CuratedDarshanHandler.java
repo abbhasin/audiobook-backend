@@ -107,8 +107,7 @@ public class CuratedDarshanHandler implements Runnable {
         lastGodsMandir.set(darshans
                 .stream()
                 .findFirst()
-                .map(darshan -> darshanDao.getDarshan(darshan.getDarshanId())
-                        .map(Darshan::getMandirId).get())
+                .map(Darshan::getMandirId)
                 .orElse(lastGodsMandir.get()));
     }
 

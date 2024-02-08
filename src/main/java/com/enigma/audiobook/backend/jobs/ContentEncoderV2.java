@@ -17,18 +17,18 @@ public class ContentEncoderV2 {
 
     public static void main(String[] args) throws Exception {
 
-        String inputFile = "/Users/akhil/Downloads/test/video2/raw/videoplayback.mp4";
-        String outputFile = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls/out2.m3u8";
-//        updateVideoContent(inputFile, outputFile);
+        String inputFile = "/Users/akhil/Downloads/videos/shiv_ji_video_bhajan.mp4";
+        String outputFile = "/Users/akhil/Downloads/videos/shiv_ji_bhajan_hls";
+        updateVideoContentToDir(inputFile, outputFile);
 
 //        System.out.println(System.getProperty("java.io.tmpdir"));
-        String outputThumbnailFile = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls/thumbnail.jpg";
-        String outFile2 = "/Users/akhil/Downloads/test/video2/raw/videoplayback.mp4";
-        String outTNFile = "/Users/akhil/Downloads/test/video2/raw/thumbnail.jpg";
-        String outputThumbnailDir = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls";
-        getContentDurationSec(outFile2);
-//        generateThumbnail(outFile2, outputThumbnailFile);
-        generateThumbnailToDir(outFile2, outputThumbnailDir);
+//        String outputThumbnailFile = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls/thumbnail.jpg";
+//        String outFile2 = "/Users/akhil/Downloads/test/video2/raw/videoplayback.mp4";
+//        String outTNFile = "/Users/akhil/Downloads/test/video2/raw/thumbnail.jpg";
+//        String outputThumbnailDir = "/Users/akhil/Downloads/test/video2/ID-34kjbnwed34/hls";
+//        getContentDurationSec(outFile2);
+////        generateThumbnail(outFile2, outputThumbnailFile);
+//        generateThumbnailToDir(outFile2, outputThumbnailDir);
 
 //
 //        String inputImg = "/Users/akhil/Downloads/IMG_0728.PNG";
@@ -56,7 +56,9 @@ public class ContentEncoderV2 {
     }
 
     public static void updateAudioContent(String inputFile, String outputFile) throws IOException, InterruptedException {
-        String[] cmd = new String[]{"-i", inputFile, "-c:a", "aac", "-b:a", "128k", "-hls_time", "10",
+        String[] cmd = new String[]{"-i", inputFile, "-c:a", "aac", "-b:a", "128k",
+                "-force_key_frames", "expr:gte(t,n_forced*10)",
+                "-hls_time", "10",
                 "-hls_list_size", "0", outputFile};
         updateViaFFMPEG(Arrays.asList(cmd));
     }
@@ -68,7 +70,7 @@ public class ContentEncoderV2 {
     public static void updateVideoContent(String inputFile, String outputFile) throws IOException, InterruptedException {
         // scale=-2:480 maintains the same aspect ration as original video
         String[] cmd = new String[]{"-i", inputFile, "-vf", "scale=-2:480", "-c:v", "h264", "-b:v", "500k",
-                "-c:a", "aac", "-b:a", "128k", "-hls_time", "10", "-hls_list_size", "0", outputFile};
+                "-c:a", "aac", "-b:a", "128k", "-force_key_frames", "expr:gte(t,n_forced*10)", "-hls_time", "10", "-hls_list_size", "0", outputFile};
         updateViaFFMPEG(Arrays.asList(cmd));
     }
 
