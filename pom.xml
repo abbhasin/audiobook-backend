@@ -36,6 +36,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.enigma.audiobook.models</groupId>
+            <artifactId>audiobook-models</artifactId>
+            <version>1.1-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>33.0.0-jre</version>

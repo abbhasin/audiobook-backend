@@ -553,6 +553,57 @@ public class OneGodService {
                 .collect(Collectors.toList());
     }
 
+    public FeedPageResponse getCuratedFeedPage(CuratedFeedRequest curatedFeedRequest) {
+        CuratedFeedResponse curatedFeedResponse = getCuratedFeed(curatedFeedRequest);
+        List<FeedItem> feedItems =
+                curatedFeedResponse.getPosts()
+                        .stream()
+                        .map(post -> {
+                            FeedItem feedItem = new FeedItem();
+                            feedItem.setPost(post);
+                            switch (post.getAssociationType()) {
+                                case MANDIR:
+                                    Optional<Mandir> mandir = mandirDao.getMandir(post.getAssociatedMandirId());
+                                    Preconditions.checkState(mandir.isPresent());
+                                    mandir.ifPresent(m -> {
+                                        feedItem.setFrom(m.getName());
+                                        feedItem.setFromImgUrl(m.getImageUrl());
+                                    });
+                                    break;
+                                case INFLUENCER:
+                                    Optional<Influencer> influencer = influencerDao.getInfleuncer(post.getAssociatedInfluencerId());
+                                    Preconditions.checkState(influencer.isPresent());
+                                    influencer.ifPresent(i -> {
+                                        feedItem.setFrom(i.getName());
+                                        feedItem.setFromImgUrl(i.getImageUrl());
+                                    });
+                                    break;
+                                case GOD:
+                                    Optional<God> god = godDao.getGod(post.getAssociatedGodId());
+                                    Preconditions.checkState(god.isPresent());
+                                    god.ifPresent(g -> {
+                                        feedItem.setFrom(g.getGodName());
+                                        feedItem.setFromImgUrl(g.getImageUrl());
+                                    });
+                                    break;
+                            }
+                            return feedItem;
+                        }).toList();
+
+        int followingsCount =
+                followingsDao.getFollowingsForUser(curatedFeedRequest.getUserId()).size();
+
+        FeedItemHeader feedItemHeader = new FeedItemHeader();
+        feedItemHeader.setFollowingsCount(followingsCount);
+
+        FeedPageResponse feedPageResponse = new FeedPageResponse();
+        feedPageResponse.setFeedItems(feedItems);
+        feedPageResponse.setFeedItemHeader(feedItemHeader);
+        feedPageResponse.setCuratedFeedPaginationKey(curatedFeedResponse.getCuratedFeedPaginationKey());
+
+        return feedPageResponse;
+    }
+
     public CuratedFeedResponse getCuratedFeed(CuratedFeedRequest curatedFeedRequest) {
         String userId = curatedFeedRequest.getUserId();
         checkUserExists(userId);
