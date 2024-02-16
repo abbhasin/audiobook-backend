@@ -4,6 +4,7 @@ import com.enigma.audiobook.backend.models.Influencer;
 import com.enigma.audiobook.backend.models.requests.InfluencerContentUploadReq;
 import com.enigma.audiobook.backend.models.requests.InfluencerInitRequest;
 import com.enigma.audiobook.backend.models.responses.InfluencerCompletionResponse;
+import com.enigma.audiobook.backend.models.responses.InfluencerForUser;
 import com.enigma.audiobook.backend.models.responses.InfluencerInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,23 @@ public class InfluencerRegController {
                                                    @RequestParam("lastInfluencerId") String lastInfluencerId) {
         limit = (limit == 0) ? 10 : limit;
         return oneGodService.getNextPageOfInfluencers(limit, lastInfluencerId);
+    }
+
+    @GetMapping("/influencers/users")
+    @ResponseBody
+    public List<InfluencerForUser> getinfluencersForUser(@RequestParam("limit") int limit,
+                                                         @RequestParam("userId") String userId) {
+        limit = (limit == 0) ? 10 : limit;
+        return oneGodService.getInfluencersForUser(limit, userId);
+    }
+
+    @GetMapping("/influencers/users/pagination")
+    @ResponseBody
+    public List<InfluencerForUser> getinfluencersForUserNextPage(@RequestParam("limit") int limit,
+                                                                 @RequestParam("lastInfluencerId") String lastInfluencerId,
+                                                                 @RequestParam("userId") String userId) {
+        limit = (limit == 0) ? 10 : limit;
+        return oneGodService.getNextPageOfInfluencersForUser(limit, lastInfluencerId, userId);
     }
 
     @GetMapping("/influencers/{userId}")

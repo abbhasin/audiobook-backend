@@ -34,6 +34,7 @@ public class OneGodService {
     private final CuratedDarshanDao curatedDarshanDao;
     private final MandirDao mandirDao;
     private final MandirAuthDao mandirAuthDao;
+    private final UserAuthDao userAuthDao;
     private final FollowingsDao followingsDao;
     private final ScoredContentDao scoredContentDao;
     private final ViewsDao viewsDao;
@@ -134,6 +135,32 @@ public class OneGodService {
         return godDao.getGodsPaginated(limit, lastGodId);
     }
 
+    public List<GodForUser> getGodsForUser(int limit, String userId) {
+        Set<String> followedGodIds = getFolloweeIdsForUser(userId, FollowingType.GOD);
+
+        return godDao.getGods(limit)
+                .stream()
+                .map(god -> {
+                    GodForUser godForUser = new GodForUser();
+                    godForUser.setGod(god);
+                    godForUser.setFollowed(followedGodIds.contains(god.getGodId()));
+                    return godForUser;
+                }).toList();
+    }
+
+    public List<GodForUser> getNextPageOfGodsForUser(int limit, String lastGodId, String userId) {
+        Set<String> followedGodIds = getFolloweeIdsForUser(userId, FollowingType.GOD);
+
+        return godDao.getGodsPaginated(limit, lastGodId)
+                .stream()
+                .map(god -> {
+                    GodForUser godForUser = new GodForUser();
+                    godForUser.setGod(god);
+                    godForUser.setFollowed(followedGodIds.contains(god.getGodId()));
+                    return godForUser;
+                }).toList();
+    }
+
     public God getGod(String godId) {
         return godDao.getGod(godId).orElse(null);
     }
@@ -212,6 +239,32 @@ public class OneGodService {
 
     public List<Influencer> getNextPageOfInfluencers(int limit, String lastInfluencerId) {
         return influencerDao.getInfleuncersPaginated(limit, lastInfluencerId);
+    }
+
+    public List<InfluencerForUser> getInfluencersForUser(int limit, String userId) {
+        Set<String> followedInfluencerIds = getFolloweeIdsForUser(userId, FollowingType.INFLUENCER);
+
+        return influencerDao.getInfluencers(limit)
+                .stream()
+                .map(influencer -> {
+                    InfluencerForUser influencerForUser = new InfluencerForUser();
+                    influencerForUser.setInfluencer(influencer);
+                    influencerForUser.setFollowed(followedInfluencerIds.contains(influencer.getUserId()));
+                    return influencerForUser;
+                }).toList();
+    }
+
+    public List<InfluencerForUser> getNextPageOfInfluencersForUser(int limit, String lastInfluencerId, String userId) {
+        Set<String> followedInfluencerIds = getFolloweeIdsForUser(userId, FollowingType.INFLUENCER);
+
+        return influencerDao.getInfleuncersPaginated(limit, lastInfluencerId)
+                .stream()
+                .map(influencer -> {
+                    InfluencerForUser influencerForUser = new InfluencerForUser();
+                    influencerForUser.setInfluencer(influencer);
+                    influencerForUser.setFollowed(followedInfluencerIds.contains(influencer.getUserId()));
+                    return influencerForUser;
+                }).toList();
     }
 
     public Influencer getInfluencer(String userId) {
@@ -365,7 +418,203 @@ public class OneGodService {
 
     public List<Post> getPostsPaginated(int limit, String id, PostAssociationType associationType,
                                         String lastPostId) {
-        return postsDao.getPostsPaginated(id, associationType, limit, lastPostId);
+        return postsDao.getPostsPaginated(id, associationType, limit, Optional.ofNullable(lastPostId),
+                true);
+    }
+
+    public List<Post> getPostsOfGod(int limit, String godId) {
+        Optional<God> god = godDao.getGod(godId);
+        Preconditions.checkState(god.isPresent());
+        return postsDao.getPostOfGod(godId, god.get().getGodName(), limit, Optional.empty(), true);
+    }
+
+    public FeedPageResponse getFeedOfMandir(int limit, String mandirId, String forUserId,
+                                            boolean onlyProcessed,
+                                            Optional<String> lastPostId) {
+        Optional<Mandir> mandir = mandirDao.getMandir(mandirId);
+        Preconditions.checkState(mandir.isPresent());
+        boolean isUserAuthorizedForPosts =
+                userAuthDao.isUserAuthorized(forUserId, mandirId, AuthAssociationType.MANDIR);
+        List<FeedItem> feedItems =
+                postsDao.getPostsPaginated(
+                                mandirId,
+                                PostAssociationType.MANDIR,
+                                limit, lastPostId,
+                                !isUserAuthorizedForPosts)
+                        .stream()
+                        .map(this::postToFeedItem)
+                        .toList();
+
+        FeedItemHeader feedItemHeader = new FeedItemHeader();
+
+        MandirFeedHeader mandirFeedHeader = new MandirFeedHeader();
+        mandirFeedHeader.setName(mandir.get().getName());
+        mandirFeedHeader.setDescription(mandir.get().getDescription());
+        mandirFeedHeader.setImageUrls(mandir.get().getImageUrl());
+        mandirFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
+
+        int followingCount = followingsDao.countFollowingsForFollowee(mandirId, FollowingType.MANDIR);
+        mandirFeedHeader.setFollowersCount(followingCount);
+
+        if (isUserAuthorizedForPosts) {
+            List<PostAMessageInfo.Tag> tags =
+                    godDao.getGods(1000)
+                            .stream().map(g -> {
+                                PostAMessageInfo.Tag tag = new PostAMessageInfo.Tag();
+                                tag.setId(g.getGodId());
+                                tag.setName(g.getGodName());
+                                return tag;
+                            }).toList();
+            PostAMessageInfo postAMessageInfo = new PostAMessageInfo();
+            postAMessageInfo.setTags(tags);
+            mandirFeedHeader.setPostAMessageInfo(postAMessageInfo);
+        }
+
+        feedItemHeader.setMandirFeedHeader(mandirFeedHeader);
+
+        FeedPageResponse feedPageResponse = new FeedPageResponse();
+        feedPageResponse.setFeedItemHeader(feedItemHeader);
+        feedPageResponse.setFeedItems(feedItems);
+
+        MandirFeedPaginationKey feedePaginationKey = new MandirFeedPaginationKey();
+        if (!feedItems.isEmpty()) {
+            feedePaginationKey.setLastPostId(feedItems.get(feedItems.size() - 1).getPost().getPostId());
+        }
+        CuratedFeedPaginationKey curatedFeedPaginationKey = new CuratedFeedPaginationKey();
+        curatedFeedPaginationKey.setMandirFeedPaginationKey(feedePaginationKey);
+        feedPageResponse.setCuratedFeedPaginationKey(curatedFeedPaginationKey);
+
+        return feedPageResponse;
+    }
+
+    public FeedPageResponse getFeedOfGod(int limit, String godId, String forUserId,
+                                         boolean onlyProcessed,
+                                         Optional<String> lastPostId) {
+        Optional<God> god = godDao.getGod(godId);
+        Preconditions.checkState(god.isPresent());
+        boolean isUserAuthorizedForPosts = userAuthDao.isUserAuthorized(forUserId, godId, AuthAssociationType.GOD);
+        List<FeedItem> feedItems =
+                postsDao.getPostOfGod(godId, god.get().getGodName(),
+                                limit, lastPostId,
+                                !isUserAuthorizedForPosts)
+                        .stream()
+                        .map(this::postToFeedItem)
+                        .toList();
+
+        FeedItemHeader feedItemHeader = new FeedItemHeader();
+
+        GodFeedHeader godFeedHeader = new GodFeedHeader();
+        godFeedHeader.setName(god.get().getGodName());
+        godFeedHeader.setDescription(god.get().getDescription());
+        godFeedHeader.setImageUrls(god.get().getImageUrl());
+        godFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
+
+        int followingCount = followingsDao.countFollowingsForFollowee(godId, FollowingType.GOD);
+        godFeedHeader.setFollowersCount(followingCount);
+
+        if (isUserAuthorizedForPosts) {
+            List<PostAMessageInfo.Tag> tags =
+                    godDao.getGods(1000)
+                            .stream().map(g -> {
+                                PostAMessageInfo.Tag tag = new PostAMessageInfo.Tag();
+                                tag.setId(g.getGodId());
+                                tag.setName(g.getGodName());
+                                return tag;
+                            }).toList();
+            PostAMessageInfo postAMessageInfo = new PostAMessageInfo();
+            postAMessageInfo.setTags(tags);
+            godFeedHeader.setPostAMessageInfo(postAMessageInfo);
+        }
+
+        feedItemHeader.setGodFeedHeader(godFeedHeader);
+
+        FeedPageResponse feedPageResponse = new FeedPageResponse();
+        feedPageResponse.setFeedItemHeader(feedItemHeader);
+        feedPageResponse.setFeedItems(feedItems);
+
+        GodFeedePaginationKey godFeedePaginationKey = new GodFeedePaginationKey();
+        if (!feedItems.isEmpty()) {
+            godFeedePaginationKey.setLastPostId(feedItems.get(feedItems.size() - 1).getPost().getPostId());
+        }
+        CuratedFeedPaginationKey curatedFeedPaginationKey = new CuratedFeedPaginationKey();
+        curatedFeedPaginationKey.setGodFeedePaginationKey(godFeedePaginationKey);
+        feedPageResponse.setCuratedFeedPaginationKey(curatedFeedPaginationKey);
+
+        return feedPageResponse;
+    }
+
+    public List<Post> getPostsOfGodPaginated(int limit, String godId,
+                                             String lastPostId) {
+        Optional<God> god = godDao.getGod(godId);
+        Preconditions.checkState(god.isPresent());
+        return postsDao.getPostOfGod(godId, god.get().getGodName(), limit, Optional.ofNullable(lastPostId), true);
+    }
+
+    public List<Post> getPostsOfInfluencer(int limit, String id, boolean onlyProcessed) {
+        return postsDao.getPostForInfluencer(id, limit, Optional.empty(), onlyProcessed);
+    }
+
+    public FeedPageResponse getFeedOfInfluencer(int limit, String influencerId, String forUserId,
+                                                boolean onlyProcessed,
+                                                Optional<String> lastPostId) {
+        Optional<Influencer> influencer = influencerDao.getInfleuncer(influencerId);
+        Preconditions.checkState(influencer.isPresent());
+        boolean isUserAuthorizedForPosts = influencerId.equals(forUserId) ||
+                userAuthDao.isUserAuthorized(forUserId, influencerId, AuthAssociationType.INFLUENCER);
+        List<FeedItem> feedItems =
+                postsDao.getPostForInfluencer(
+                                influencerId,
+                                limit, lastPostId,
+                                !isUserAuthorizedForPosts)
+                        .stream()
+                        .map(this::postToFeedItem)
+                        .toList();
+
+        FeedItemHeader feedItemHeader = new FeedItemHeader();
+
+        InfluencerFeedHeader influencerFeedHeader = new InfluencerFeedHeader();
+        influencerFeedHeader.setName(influencer.get().getName());
+        influencerFeedHeader.setDescription(influencer.get().getDescription());
+        influencerFeedHeader.setImageUrls(influencer.get().getImageUrl());
+        influencerFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
+
+        int followingCount = followingsDao.countFollowingsForFollowee(influencerId, FollowingType.INFLUENCER);
+        influencerFeedHeader.setFollowersCount(followingCount);
+
+        if (isUserAuthorizedForPosts) {
+            List<PostAMessageInfo.Tag> tags =
+                    godDao.getGods(1000)
+                            .stream().map(g -> {
+                                PostAMessageInfo.Tag tag = new PostAMessageInfo.Tag();
+                                tag.setId(g.getGodId());
+                                tag.setName(g.getGodName());
+                                return tag;
+                            }).toList();
+            PostAMessageInfo postAMessageInfo = new PostAMessageInfo();
+            postAMessageInfo.setTags(tags);
+            influencerFeedHeader.setPostAMessageInfo(postAMessageInfo);
+        }
+
+        feedItemHeader.setInfluencerFeedHeader(influencerFeedHeader);
+
+        FeedPageResponse feedPageResponse = new FeedPageResponse();
+        feedPageResponse.setFeedItemHeader(feedItemHeader);
+        feedPageResponse.setFeedItems(feedItems);
+
+        InfluencerFeedPaginationKey feedePaginationKey = new InfluencerFeedPaginationKey();
+        if (!feedItems.isEmpty()) {
+            feedePaginationKey.setLastPostId(feedItems.get(feedItems.size() - 1).getPost().getPostId());
+        }
+        CuratedFeedPaginationKey curatedFeedPaginationKey = new CuratedFeedPaginationKey();
+        curatedFeedPaginationKey.setInfluencerFeedPaginationKey(feedePaginationKey);
+        feedPageResponse.setCuratedFeedPaginationKey(curatedFeedPaginationKey);
+
+        return feedPageResponse;
+    }
+
+    public List<Post> getPostsByInfluencerPaginated(int limit, String id,
+                                                    String lastPostId, boolean onlyProcessed) {
+        return postsDao.getPostForInfluencer(id, limit, Optional.ofNullable(lastPostId), onlyProcessed);
     }
 
     public DarshanInitResponse initDarshan(DarshanInitRequest darshanInitRequest) {
@@ -536,21 +785,56 @@ public class OneGodService {
         return mandirDao.getMandirs(limit);
     }
 
+    public List<MandirForUser> getMandirsForUser(int limit, String userId) {
+        Set<String> followedMandirIds = getFolloweeIdsForUser(userId, FollowingType.MANDIR);
+        return mandirDao.getMandirs(limit)
+                .stream()
+                .map(mandir -> {
+                    MandirForUser m = new MandirForUser();
+                    m.setMandir(mandir);
+                    m.setFollowed(followedMandirIds.contains(mandir.getMandirId()));
+                    return m;
+                }).toList();
+    }
+
     public List<Mandir> getMandirsPaginated(int limit, String lastMandirId) {
         return mandirDao.getMandirsPaginated(limit, lastMandirId);
     }
 
+    public List<MandirForUser> getMandirsForUser(int limit, String lastMandirId, String userId) {
+        Set<String> followedMandirIds = getFolloweeIdsForUser(userId, FollowingType.MANDIR);
+        return mandirDao.getMandirsPaginated(limit, lastMandirId)
+                .stream()
+                .map(mandir -> {
+                    MandirForUser m = new MandirForUser();
+                    m.setMandir(mandir);
+                    m.setFollowed(followedMandirIds.contains(mandir.getMandirId()));
+                    return m;
+                }).toList();
+    }
+
     public void addMandirAuth(String mandirId, String userId) {
         checkAuthorization(userId);
-        mandirAuthDao.addMandirAuth(mandirId, userId, MandirAuth.ADMIN);
+        userAuthDao.addUserAuth(mandirId, userId, AuthType.ADMIN, AuthAssociationType.MANDIR);
+    }
+
+    public void addInfluencerAuth(String influencerId, String userId) {
+        checkAuthorization(userId);
+        userAuthDao.addUserAuth(influencerId, userId, AuthType.ADMIN, AuthAssociationType.INFLUENCER);
+    }
+
+    public void addGodAuth(String godId, String userId) {
+        checkAuthorization(userId);
+        userAuthDao.addUserAuth(godId, userId, AuthType.ADMIN, AuthAssociationType.GOD);
     }
 
     public List<Mandir> getAuthorizedMandirForUser(String userId) {
         checkAuthorization(userId);
-        return mandirAuthDao.getMandirsWithAdminPermission(userId)
+        return userAuthDao.getAuthWithAdminPermission(userId)
                 .stream()
-                .map(mandirId -> mandirDao.getMandir(mandirId).get())
-                .collect(Collectors.toList());
+                .filter(auth -> auth.getAssociationType().equals(AuthAssociationType.MANDIR))
+                .map(auth -> mandirDao.getMandir(auth.getResourceId()).get())
+                .toList();
     }
 
     public FeedPageResponse getCuratedFeedPage(CuratedFeedRequest curatedFeedRequest) {
@@ -558,49 +842,59 @@ public class OneGodService {
         List<FeedItem> feedItems =
                 curatedFeedResponse.getPosts()
                         .stream()
-                        .map(post -> {
-                            FeedItem feedItem = new FeedItem();
-                            feedItem.setPost(post);
-                            switch (post.getAssociationType()) {
-                                case MANDIR:
-                                    Optional<Mandir> mandir = mandirDao.getMandir(post.getAssociatedMandirId());
-                                    Preconditions.checkState(mandir.isPresent());
-                                    mandir.ifPresent(m -> {
-                                        feedItem.setFrom(m.getName());
-                                        feedItem.setFromImgUrl(m.getImageUrl());
-                                    });
-                                    break;
-                                case INFLUENCER:
-                                    Optional<Influencer> influencer = influencerDao.getInfleuncer(post.getAssociatedInfluencerId());
-                                    Preconditions.checkState(influencer.isPresent());
-                                    influencer.ifPresent(i -> {
-                                        feedItem.setFrom(i.getName());
-                                        feedItem.setFromImgUrl(i.getImageUrl());
-                                    });
-                                    break;
-                                case GOD:
-                                    Optional<God> god = godDao.getGod(post.getAssociatedGodId());
-                                    Preconditions.checkState(god.isPresent());
-                                    god.ifPresent(g -> {
-                                        feedItem.setFrom(g.getGodName());
-                                        feedItem.setFromImgUrl(g.getImageUrl());
-                                    });
-                                    break;
-                            }
-                            return feedItem;
-                        }).toList();
+                        .map(this::postToFeedItem)
+                        .toList();
 
         int followingsCount =
                 followingsDao.getFollowingsForUser(curatedFeedRequest.getUserId()).size();
 
+        FeedPageResponse feedPageResponse = getFeedPageResponse(followingsCount, feedItems, curatedFeedResponse);
+
+        return feedPageResponse;
+    }
+
+    private FeedItem postToFeedItem(Post post) {
+        FeedItem feedItem = new FeedItem();
+        feedItem.setPost(post);
+        switch (post.getAssociationType()) {
+            case MANDIR:
+                Optional<Mandir> mandir = mandirDao.getMandir(post.getAssociatedMandirId());
+                Preconditions.checkState(mandir.isPresent());
+                mandir.ifPresent(m -> {
+                    feedItem.setFrom(m.getName());
+                    feedItem.setFromImgUrl(m.getImageUrl());
+                });
+                break;
+            case INFLUENCER:
+                Optional<Influencer> influencer = influencerDao.getInfleuncer(post.getAssociatedInfluencerId());
+                Preconditions.checkState(influencer.isPresent());
+                influencer.ifPresent(i -> {
+                    feedItem.setFrom(i.getName());
+                    feedItem.setFromImgUrl(i.getImageUrl());
+                });
+                break;
+            case GOD:
+                Optional<God> god = godDao.getGod(post.getAssociatedGodId());
+                Preconditions.checkState(god.isPresent());
+                god.ifPresent(g -> {
+                    feedItem.setFrom(g.getGodName());
+                    feedItem.setFromImgUrl(g.getImageUrl());
+                });
+                break;
+        }
+        return feedItem;
+    }
+
+    private static FeedPageResponse getFeedPageResponse(int followingsCount, List<FeedItem> feedItems, CuratedFeedResponse curatedFeedResponse) {
         FeedItemHeader feedItemHeader = new FeedItemHeader();
-        feedItemHeader.setFollowingsCount(followingsCount);
+        MyFeedHeader myFeedHeader = new MyFeedHeader();
+        myFeedHeader.setFollowingsCount(followingsCount);
+        feedItemHeader.setMyFeedHeader(myFeedHeader);
 
         FeedPageResponse feedPageResponse = new FeedPageResponse();
         feedPageResponse.setFeedItems(feedItems);
         feedPageResponse.setFeedItemHeader(feedItemHeader);
         feedPageResponse.setCuratedFeedPaginationKey(curatedFeedResponse.getCuratedFeedPaginationKey());
-
         return feedPageResponse;
     }
 
@@ -843,6 +1137,13 @@ public class OneGodService {
 
     public void addViewForUser(View view) {
         viewsDao.upsertView(view);
+    }
+
+    private Set<String> getFolloweeIdsForUser(String userId, FollowingType followingType) {
+        return followingsDao.getFollowingsForUser(userId, followingType)
+                .stream()
+                .map(Following::getFolloweeId)
+                .collect(Collectors.toSet());
     }
 
     private void checkUserExists(String userId) {

@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Sorts.descending;
 
 @Slf4j
@@ -182,12 +182,106 @@ public class PostsDao extends BaseDao {
         }
     }
 
+    public List<Post> getPostForInfluencer(String influencerId, int limit,
+                                           Optional<String> lastPostId,
+                                           boolean onlyProcessed) {
+        MongoCollection<Document> collection = getCollection();
+
+        Bson fromUserIdFilter = eq("fromUserId", new ObjectId(influencerId));
+        Bson influencerIdFilter = eq("associatedInfluencerId", new ObjectId(influencerId));
+        Bson filter = Filters.or(fromUserIdFilter, influencerIdFilter);
+
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        Bson contentFilterRaw = Filters.eq("contentUploadStatus", ContentUploadStatus.RAW_UPLOADED);
+        if (onlyProcessed) {
+            filter = Filters.and(filter, contentFilter);
+        } else {
+            filter = Filters.and(
+                    filter,
+                    Filters.or(contentFilter, contentFilterRaw));
+        }
+
+        if (lastPostId.isPresent()) {
+            filter = Filters.and(
+                    filter,
+                    lt("_id", lastPostId.get())
+            );
+        }
+
+        FindIterable<Document> docs = collection.find(fromUserIdFilter)
+                .sort(descending("_id")) // _id contains the create time as well
+                .limit(limit);
+
+        List<Post> posts = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                posts.add(serde.fromJson(doc.toJson(), Post.class));
+            }
+        }
+        return posts;
+    }
+
+    public List<Post> getPostOfGod(String godId,
+                                   String godName,
+                                   int limit,
+                                   Optional<String> lastPostId,
+                                   boolean onlyProcessed) {
+        MongoCollection<Document> collection = getCollection();
+
+        Bson godIdFilter = eq("associatedGodId", new ObjectId(godId));
+        Bson godNameTagFilter = eq("tag", godName);
+        Bson filter = Filters.or(godIdFilter, godNameTagFilter);
+
+        Bson contentFilterProcessed = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+        Bson contentFilterRaw = Filters.eq("contentUploadStatus", ContentUploadStatus.RAW_UPLOADED);
+        if (onlyProcessed) {
+            filter = Filters.and(filter, contentFilterProcessed);
+        } else {
+            filter = Filters.and(
+                    filter,
+                    Filters.or(contentFilterProcessed, contentFilterRaw));
+        }
+
+
+        if (lastPostId.isPresent()) {
+            filter = Filters.and(
+                    filter,
+                    lt("_id", lastPostId.get())
+            );
+        }
+
+        FindIterable<Document> docs = collection.find(filter)
+                .sort(descending("_id")) // _id contains the create time as well
+                .limit(limit);
+
+        List<Post> posts = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                posts.add(serde.fromJson(doc.toJson(), Post.class));
+            }
+        }
+        return posts;
+    }
+
     public List<Post> getPosts(String associationId, PostAssociationType associationType, int limit) {
         MongoCollection<Document> collection = getCollection();
         Bson contentFilter = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
                 Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
         );
+
+
+
         Bson idFilter;
         switch (associationType) {
             case MANDIR:
@@ -223,12 +317,10 @@ public class PostsDao extends BaseDao {
         return posts;
     }
 
-    public List<Post> getPostsPaginated(String associationId, PostAssociationType associationType, int limit, String lastPostId) {
+    public List<Post> getPostsPaginated(String associationId, PostAssociationType associationType, int limit,
+                                        Optional<String> lastPostId,
+                                        boolean onlyProcessed) {
         MongoCollection<Document> collection = getCollection();
-        Bson contentFilter = Filters.or(
-                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
-                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
-        );
         Bson associationIdFilter;
         switch (associationType) {
             case MANDIR:
@@ -243,11 +335,29 @@ public class PostsDao extends BaseDao {
             default:
                 throw new IllegalStateException("unhandled association type:" + associationType);
         }
-        Bson filter = Filters.and(
-                Filters.lt("_id", new ObjectId(lastPostId)),
-                associationIdFilter,
-                contentFilter
+
+        Bson filter = associationIdFilter;
+
+        Bson contentFilterProcessed = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
         );
+        Bson contentFilterRaw = Filters.eq("contentUploadStatus", ContentUploadStatus.RAW_UPLOADED);
+
+        if (onlyProcessed) {
+            filter = Filters.and(filter, contentFilterProcessed);
+        } else {
+            filter = Filters.and(
+                    filter,
+                    Filters.or(contentFilterProcessed, contentFilterRaw));
+        }
+
+        if(lastPostId.isPresent()) {
+            filter = Filters.and(
+                    filter,
+                    lt("_id", new ObjectId(lastPostId.get()))
+            );
+        }
 
         FindIterable<Document> docs = collection.find(filter)
                 .sort(descending("_id")) // _id contains the create time as well
@@ -298,7 +408,7 @@ public class PostsDao extends BaseDao {
         );
 
         if (lastPostId.isPresent()) {
-            Bson postIdFilter = Filters.lt("_id", new ObjectId(lastPostId.get()));
+            Bson postIdFilter = lt("_id", new ObjectId(lastPostId.get()));
             finalFilter = Filters.and(finalFilter, postIdFilter);
         }
         return finalFilter;

@@ -4,6 +4,7 @@ import com.enigma.audiobook.backend.models.Mandir;
 import com.enigma.audiobook.backend.models.requests.MandirContentUploadReq;
 import com.enigma.audiobook.backend.models.requests.MandirInitRequest;
 import com.enigma.audiobook.backend.models.responses.MandirCompletionResponse;
+import com.enigma.audiobook.backend.models.responses.MandirForUser;
 import com.enigma.audiobook.backend.models.responses.MandirInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,11 +36,27 @@ public class MandirController {
         return oneGodService.getMandirs(limit);
     }
 
+    @GetMapping("/mandirs/users")
+    @ResponseBody
+    public List<MandirForUser> getMandirsForUser(@RequestParam("limit") int limit, @RequestParam("userId") String userId) {
+        limit = (limit == 0) ? 10 : limit;
+        return oneGodService.getMandirsForUser(limit, userId);
+    }
+
     @GetMapping("/mandirs/pagination")
     @ResponseBody
     public List<Mandir> getMandirsNextPage(@RequestParam("limit") int limit, @RequestParam("lastMandirId") String lastMandirId) {
         limit = (limit == 0) ? 10 : limit;
         return oneGodService.getMandirsPaginated(limit, lastMandirId);
+    }
+
+    @GetMapping("/mandirs/users/pagination")
+    @ResponseBody
+    public List<MandirForUser> getMandirsForUserNextPage(@RequestParam("limit") int limit,
+                                                         @RequestParam("lastMandirId") String lastMandirId,
+                                                         @RequestParam("userId") String userId) {
+        limit = (limit == 0) ? 10 : limit;
+        return oneGodService.getMandirsForUser(limit, lastMandirId, userId);
     }
 
     @GetMapping("/mandirs/{mandirId}")

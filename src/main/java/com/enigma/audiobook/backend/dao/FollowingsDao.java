@@ -1,6 +1,7 @@
 package com.enigma.audiobook.backend.dao;
 
 import com.enigma.audiobook.backend.models.Following;
+import com.enigma.audiobook.backend.models.FollowingType;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
@@ -133,7 +134,43 @@ public class FollowingsDao extends BaseDao {
         }
 
         return followings;
+    }
 
+    public int countFollowingsForFollowee(String followeeId, FollowingType followingType) {
+        MongoCollection<Document> collection = getCollection();
+
+        long count = collection.countDocuments(
+                Filters.and(
+                        eq("followeeId", new ObjectId(followeeId)),
+                        eq("followingType", followingType.name()),
+                        eq("isDeleted", false)
+                )
+        );
+
+        return (int) count;
+    }
+
+    public List<Following> getFollowingsForUser(String userId, FollowingType followingType) {
+        MongoCollection<Document> collection = getCollection();
+
+        FindIterable<Document> docs = collection.find(
+                Filters.and(
+                        eq("followerUserId", new ObjectId(userId)),
+                        eq("followingType", followingType.name()),
+                        eq("isDeleted", false)
+                )
+        );
+
+        List<Following> followings = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                followings.add(serde.fromJson(doc.toJson(), Following.class));
+            }
+        }
+
+        return followings;
     }
 
     private MongoCollection<Document> getCollection() {

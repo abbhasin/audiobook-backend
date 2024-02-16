@@ -37,12 +37,13 @@ public class PostsController {
         return oneGodService.getPosts(limit, mandirId, PostAssociationType.MANDIR);
     }
 
-    @GetMapping("/posts/infleuncer/{influencerId}")
+    @GetMapping("/posts/influencer/{influencerId}")
     @ResponseBody
     public List<Post> getPostsByInfluencer(@RequestParam("limit") int limit,
+                                           @RequestParam("onlyProcessed") boolean onlyProcessed,
                                            @PathVariable("influencerId") String influencerId) {
         limit = (limit == 0) ? 10 : limit;
-        return oneGodService.getPosts(limit, influencerId, PostAssociationType.INFLUENCER);
+        return oneGodService.getPostsOfInfluencer(limit, influencerId, onlyProcessed);
     }
 
     @GetMapping("/posts/god/{godId}")
@@ -50,7 +51,7 @@ public class PostsController {
     public List<Post> getPostsByGod(@RequestParam("limit") int limit,
                                     @PathVariable("godId") String godId) {
         limit = (limit == 0) ? 10 : limit;
-        return oneGodService.getPosts(limit, godId, PostAssociationType.GOD);
+        return oneGodService.getPostsOfGod(limit, godId);
     }
 
     @GetMapping("/posts/mandir/pagination/{mandirId}")
@@ -67,10 +68,10 @@ public class PostsController {
     @ResponseBody
     public List<Post> getPostsByInfluencerNext(@RequestParam("limit") int limit,
                                                @RequestParam("lastPostId") String lastPostId,
+                                               @RequestParam("onlyProcessed") boolean onlyProcessed,
                                                @PathVariable("influencerId") String influencerId) {
         limit = (limit == 0) ? 10 : limit;
-        return oneGodService.getPostsPaginated(limit, influencerId,
-                PostAssociationType.INFLUENCER, lastPostId);
+        return oneGodService.getPostsByInfluencerPaginated(limit, influencerId, lastPostId, onlyProcessed);
     }
 
     @GetMapping("/posts/god/pagination/{godId}")
@@ -79,8 +80,7 @@ public class PostsController {
                                         @RequestParam("lastPostId") String lastPostId,
                                         @PathVariable("godId") String godId) {
         limit = (limit == 0) ? 10 : limit;
-        return oneGodService.getPostsPaginated(limit, godId,
-                PostAssociationType.GOD, lastPostId);
+        return oneGodService.getPostsOfGodPaginated(limit, godId, lastPostId);
     }
 
     @GetMapping("/posts/{postId}")
