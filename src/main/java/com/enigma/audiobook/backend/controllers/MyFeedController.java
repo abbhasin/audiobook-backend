@@ -42,7 +42,7 @@ public class MyFeedController {
     @PostMapping("/feed/god/page")
     @ResponseBody
     public FeedPageResponse getFeedOfGod(@RequestBody GodFeedRequest godFeedRequest) {
-        log.info("feed of god req:{}", godFeedRequest);
+        log.info("getFeedOfGod:{}", godFeedRequest);
         String lastPostId = null;
         if (godFeedRequest.getCuratedFeedPaginationKey() != null &&
                 godFeedRequest.getCuratedFeedPaginationKey().getGodFeedePaginationKey() != null) {
@@ -57,6 +57,7 @@ public class MyFeedController {
     @PostMapping("/feed/mandir/page")
     @ResponseBody
     public FeedPageResponse getFeedOfMandir(@RequestBody MandirFeedRequest mandirFeedRequest) {
+        log.info("getFeedOfMandir:{}", mandirFeedRequest);
         String lastPostId = null;
         if (mandirFeedRequest.getCuratedFeedPaginationKey() != null &&
                 mandirFeedRequest.getCuratedFeedPaginationKey().getMandirFeedPaginationKey() != null) {
@@ -71,6 +72,7 @@ public class MyFeedController {
     @PostMapping("/feed/influencer/page")
     @ResponseBody
     public FeedPageResponse getFeedOfInfluencer(@RequestBody InfluencerFeedRequest influencerFeedRequest) {
+        log.info("getFeedOfInfluencer:{}", influencerFeedRequest);
         String lastPostId = null;
         if (influencerFeedRequest.getCuratedFeedPaginationKey() != null &&
                 influencerFeedRequest.getCuratedFeedPaginationKey().getInfluencerFeedPaginationKey() != null) {

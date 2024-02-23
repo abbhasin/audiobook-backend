@@ -129,7 +129,7 @@ public class InfluencerDao extends BaseDao {
         );
         FindIterable<Document> docs = collection.find(contentFilter)
 //                .projection(projectionFields)
-                .sort(ascending("_id"))
+                .sort(ascending("userId"))
                 .limit(limit);
 
         List<Influencer> influencers = new ArrayList<>();
@@ -144,7 +144,7 @@ public class InfluencerDao extends BaseDao {
         return influencers;
     }
 
-    public List<Influencer> getInfleuncersPaginated(int limit, String lastInfluencerId) {
+    public List<Influencer> getInfleuncersPaginated(int limit, String lastInfluencerUserId) {
         MongoCollection<Document> collection = getCollection();
         Bson projectionFields = Projections.fields(
                 Projections.include("_id", "userId", "imageUrl"));
@@ -152,11 +152,11 @@ public class InfluencerDao extends BaseDao {
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
                 Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
         );
-        Bson filter = Filters.and(gt("_id", new ObjectId(lastInfluencerId)),
+        Bson filter = Filters.and(gt("userId", new ObjectId(lastInfluencerUserId)),
                 contentFilter);
         FindIterable<Document> docs = collection.find(filter)
 //                .projection(projectionFields)
-                .sort(ascending("_id"))
+                .sort(ascending("userId"))
                 .limit(limit);
 
         List<Influencer> influencers = new ArrayList<>();

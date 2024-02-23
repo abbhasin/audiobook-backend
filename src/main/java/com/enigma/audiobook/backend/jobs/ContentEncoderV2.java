@@ -76,7 +76,11 @@ public class ContentEncoderV2 {
 
     public static void generateThumbnailToDir(String masterFilePath, String outputThumbnailDir) throws Exception {
         File file = new File(masterFilePath);
-        String outputFileNamePrefix = file.getName().substring(0, file.getName().lastIndexOf("."));
+        boolean suffixExtensionExists = file.getName().lastIndexOf(".") != -1;
+        String outputFileNamePrefix = suffixExtensionExists ?
+                file.getName().substring(0, file.getName().lastIndexOf(".")) :
+                file.getName();
+
         String outputFileName = String.format("%s_%s.%s", outputFileNamePrefix, "thumbnail", "jpg");
         String outputFilePath = String.format("%s/%s", outputThumbnailDir, outputFileName);
 
@@ -151,7 +155,10 @@ public class ContentEncoderV2 {
 
     private static String getFilePath(String inputFile, String outputFileDir, String suffix) {
         File file = new File(inputFile);
-        String outputFileNamePrefix = file.getName().substring(0, file.getName().lastIndexOf("."));
+        boolean suffixExtensionExists = file.getName().lastIndexOf(".") != -1;
+        String outputFileNamePrefix = suffixExtensionExists ?
+                file.getName().substring(0, file.getName().lastIndexOf(".")) :
+                file.getName();
         String outputFileName = String.format("%s.%s", outputFileNamePrefix, suffix);
         return String.format("%s/%s", outputFileDir, outputFileName);
     }

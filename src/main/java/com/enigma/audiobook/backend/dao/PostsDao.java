@@ -207,7 +207,7 @@ public class PostsDao extends BaseDao {
         if (lastPostId.isPresent()) {
             filter = Filters.and(
                     filter,
-                    lt("_id", lastPostId.get())
+                    lt("_id", new ObjectId(lastPostId.get()))
             );
         }
 
@@ -254,7 +254,7 @@ public class PostsDao extends BaseDao {
         if (lastPostId.isPresent()) {
             filter = Filters.and(
                     filter,
-                    lt("_id", lastPostId.get())
+                    lt("_id", new ObjectId(lastPostId.get()))
             );
         }
 

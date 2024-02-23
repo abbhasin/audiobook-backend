@@ -6,10 +6,11 @@ import java.net.URI;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.*;
 
 public class Tests {
 
-    public static void main(String[] args) throws ParseException {
+    public static void main1(String[] args) throws ParseException {
         URI uri = URI.create("https://one-god-dev.s3.ap-south-1.amazonaws.com/dir1/dir2/objectKey.mp4");
         System.out.println(uri);
         System.out.println(uri.getAuthority());
@@ -66,5 +67,68 @@ public class Tests {
         String pStr = serDe.toJson(p);
         System.out.println(pStr);
         System.out.println(serDe.fromJson(pStr, Post.class));
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        String uriStr = "file://media/picker/0/com.android.providers.media.photopicker/media/1000000018"
+    }
+    static ExecutorService executor1 = Executors.newFixedThreadPool(2);
+    static ExecutorService executor2 = Executors.newFixedThreadPool(2);
+    public static void main2(String[] args) throws InterruptedException {
+
+
+        Future<?> f1 = executor1.submit(() -> {
+            Future<?> f2 = executor2.submit(new TestRunnable());
+            Future<?> f3 = executor2.submit(new TestRunnable());
+            try {
+                System.out.println("f2 get");
+                f2.get();
+            } catch (InterruptedException e) {
+                System.out.println("f2 interrupted");
+//                throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+                System.out.println("exception f2");
+                throw new RuntimeException(e);
+            }
+            try {
+                System.out.println("f3 get");
+                f3.get();
+            } catch (InterruptedException e) {
+                System.out.println("f3 interrupted");
+//                throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+                System.out.println("f3 exception");
+                throw new RuntimeException(e);
+            }
+        });
+        Thread.sleep(5*1000);
+        f1.cancel(true);
+        while (true) {
+            if (f1.isCancelled()) {
+                System.out.println("first thread interrupted");
+                return;
+            }
+            if(f1.isDone()) {
+                System.out.println("first thread is done");
+                return;
+            }
+        }
+    }
+
+    static Semaphore semaphore = new Semaphore(0);
+
+    public static class TestRunnable implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+                System.out.println("executing");
+                semaphore.acquire();
+                System.out.println("executing zzz");
+            } catch (InterruptedException e) {
+                System.out.println("test runnable interrupted");
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

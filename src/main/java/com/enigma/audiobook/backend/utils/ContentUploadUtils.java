@@ -74,11 +74,20 @@ public class ContentUploadUtils {
     public UploadFileInitRes initFile(UploadFileInitReq uploadFileInitReq, String keyFormat,
                                       ContentTypeByExtension contentTypeByExtension) {
         String fn = uploadFileInitReq.getFileName();
-        String prefixFileName = fn.substring(0, fn.lastIndexOf("."));
-        String suffixExtension = fn.substring(fn.lastIndexOf(".") + 1);
+        boolean suffixExtensionExists = fn.lastIndexOf(".") != -1;
+
+        String prefixFileName = fn;
+        String suffixExtension = null;
+        if (suffixExtensionExists) {
+            prefixFileName = fn.substring(0, fn.lastIndexOf("."));
+            suffixExtension = fn.substring(fn.lastIndexOf(".") + 1);
+        }
+
 
         String encodedFileNamePrefix = new String(Base64.getEncoder().encode(prefixFileName.getBytes(StandardCharsets.UTF_8)));
-        String objectKey = String.format(keyFormat, encodedFileNamePrefix) + "." + suffixExtension;
+        String objectKey = suffixExtensionExists ?
+                String.format(keyFormat, encodedFileNamePrefix) + "." + suffixExtension :
+                String.format(keyFormat, encodedFileNamePrefix);
 
         String contentType = getContentType(suffixExtension, contentTypeByExtension);
         S3MPUInitiationResponse response =

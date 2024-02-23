@@ -55,7 +55,7 @@ public class RestClient {
         }
     }
 
-    public HeaderAndEntity doPut(String url, byte[] data) {
+    public HeaderAndEntity  doPut(String url, byte[] data) {
         URI uri = URI.create(url);
         HttpPut request = new HttpPut(uri);
         request.setEntity(new ByteArrayEntity(data));
