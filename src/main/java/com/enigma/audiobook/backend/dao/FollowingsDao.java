@@ -133,6 +133,8 @@ public class FollowingsDao extends BaseDao {
             }
         }
 
+        log.info("followings for user:{} are:{}", userId, followings);
+
         return followings;
     }
 

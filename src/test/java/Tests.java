@@ -70,7 +70,6 @@ public class Tests {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        String uriStr = "file://media/picker/0/com.android.providers.media.photopicker/media/1000000018"
     }
     static ExecutorService executor1 = Executors.newFixedThreadPool(2);
     static ExecutorService executor2 = Executors.newFixedThreadPool(2);

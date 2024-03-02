@@ -38,7 +38,7 @@
         <dependency>
             <groupId>com.enigma.audiobook.models</groupId>
             <artifactId>audiobook-models</artifactId>
-            <version>1.5-SNAPSHOT</version>
+            <version>1.6-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -121,6 +121,12 @@
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
             <version>4.5.14</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.2.0</version>
         </dependency>
 
 

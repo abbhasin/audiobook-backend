@@ -6,6 +6,7 @@ import com.enigma.audiobook.backend.dao.*;
 import com.enigma.audiobook.backend.models.*;
 import com.enigma.audiobook.backend.models.requests.*;
 import com.enigma.audiobook.backend.models.responses.*;
+import com.enigma.audiobook.backend.proxies.FirebaseClient;
 import com.enigma.audiobook.backend.utils.ContentUploadUtils;
 import com.google.common.base.Preconditions;
 import lombok.Data;
@@ -41,6 +42,7 @@ public class OneGodService {
     private final NewPostsDao newPostsDao;
     private final CollectionConfigDao collectionConfigDao;
     private final ContentUploadUtils contentUploadUtils;
+    private final FirebaseClient firebaseClient;
 
     public User createUser() {
         return userRegistrationDao.registerNewUser();
@@ -49,12 +51,23 @@ public class OneGodService {
     public UserAssociationResponse associateAuthenticatedUser(UserRegistrationInfo userRegistrationInfo) {
         Optional<User> existingUser = userRegistrationDao.getUserWithAuthId(userRegistrationInfo.getAuthUserId());
         if (existingUser.isPresent()) {
+            userRegistrationDao.updateMetadata(userRegistrationInfo.getUserId(),
+                    userRegistrationInfo.getAuthUserId());
             return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.MAPPED_TO_EXISTING_USER,
                     existingUser.get());
         }
 
+        Optional<FirebaseClient.FirebaseUserInfo> firebaseUserInfo =
+                firebaseClient.getUserInfo(userRegistrationInfo.getAuthUserId());
+
+        if (firebaseUserInfo.isEmpty()) {
+            return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.FAILED_AUTH_USER_NOT_FOUND,
+                    null);
+        }
+
         userRegistrationDao.associateAuthenticatedUser(userRegistrationInfo.getUserId(),
-                userRegistrationInfo.getAuthUserId(), userRegistrationInfo.getPhoneNumber());
+                userRegistrationInfo.getAuthUserId(), firebaseUserInfo.get().getPhoneNum());
+
         User user = userRegistrationDao.getUser(userRegistrationInfo.getUserId()).get();
         return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.MAPPED_TO_GIVEN_USER,
                 user);
@@ -272,8 +285,10 @@ public class OneGodService {
     }
 
 
-    public PostInitResponse initPosts(PostInitRequest postInitReq) {
-        checkAuthorization(postInitReq.getPost().getFromUserId());
+    public PostInitResponse initPosts(String userAuthToken, PostInitRequest postInitReq) {
+//        checkUserHasFirebaseAuth(postInitReq.getPost().getFromUserId());
+        checkUserTokenIsValid(postInitReq.getPost().getFromUserId(), userAuthToken);
+
         if (postInitReq.getPost().getType() == null) {
             postInitReq.getPost().setType(PostType.TEXT);
         }
@@ -348,8 +363,10 @@ public class OneGodService {
     }
 
 
-    public PostCompletionResponse postUploadUpdatePost(PostContentUploadReq postContentUploadReq) {
-        checkAuthorization(postContentUploadReq.getPost().getFromUserId());
+    public PostCompletionResponse postUploadUpdatePost(String userAuthToken, PostContentUploadReq postContentUploadReq) {
+//        checkUserHasFirebaseAuth(postContentUploadReq.getPost().getFromUserId());
+        checkUserTokenIsValid(postContentUploadReq.getPost().getFromUserId(), userAuthToken);
+
         Optional<Post> post = postsDao.getPost(postContentUploadReq.getPost().getPostId());
         Preconditions.checkState(post.isPresent());
         Preconditions.checkState(post.get().getType().equals(postContentUploadReq.getPost().getType()));
@@ -814,22 +831,22 @@ public class OneGodService {
     }
 
     public void addMandirAuth(String mandirId, String userId) {
-        checkAuthorization(userId);
+        checkUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(mandirId, userId, AuthType.ADMIN, AuthAssociationType.MANDIR);
     }
 
     public void addInfluencerAuth(String influencerId, String userId) {
-        checkAuthorization(userId);
+        checkUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(influencerId, userId, AuthType.ADMIN, AuthAssociationType.INFLUENCER);
     }
 
     public void addGodAuth(String godId, String userId) {
-        checkAuthorization(userId);
+        checkUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(godId, userId, AuthType.ADMIN, AuthAssociationType.GOD);
     }
 
     public List<Mandir> getAuthorizedMandirForUser(String userId) {
-        checkAuthorization(userId);
+        checkUserHasFirebaseAuth(userId);
         return userAuthDao.getAuthWithAdminPermission(userId)
                 .stream()
                 .filter(auth -> auth.getAssociationType().equals(AuthAssociationType.MANDIR))
@@ -1150,11 +1167,28 @@ public class OneGodService {
         Preconditions.checkState(userRegistrationDao.getUser(userId).isPresent());
     }
 
-    private void checkAuthorization(String userId) {
+    private void checkUserHasFirebaseAuth(String userId) {
         Optional<User> user = userRegistrationDao.getUser(userId);
         if (user.isEmpty() || StringUtils.isEmpty(user.get().getAuthUserId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "user is not authorized:" + userId);
+            String msg = "user is not authorized:" + userId;
+            log.error(msg);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
+        }
+    }
+
+    private void checkUserTokenIsValid(String userId, String userAuthToken) {
+        Optional<FirebaseClient.FirebaseUserInfo> userInfo =
+                firebaseClient.getUserFromToken(userAuthToken);
+
+        Optional<User> user = userRegistrationDao.getUser(userId);
+
+        if (userInfo.isEmpty() ||
+                user.isEmpty() ||
+                StringUtils.isEmpty(user.get().getAuthUserId()) ||
+                !userInfo.get().getUid().equals(user.get().getAuthUserId())) {
+            String msg = String.format("user is not authorized userId:%s, token:%s", userId, userAuthToken);
+            log.error(msg);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
         }
     }
 }

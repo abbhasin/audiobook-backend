@@ -82,6 +82,37 @@ public class UserRegistrationDao extends BaseDao {
         }
     }
 
+    public void updateMetadata(String userId, String unAssociatedAuthUserId) {
+        MongoCollection<Document> collection = getCollection();
+        Document query = new Document().append("_id", new ObjectId(userId));
+
+        User.Metadata metadata = getUser(userId).get().getMetadata();
+        metadata.setUnassociatedAuthUserId(unAssociatedAuthUserId);
+
+        Document metadataDoc = Document.parse(serde.toJson(metadata));
+        Bson updates = Updates.combine(
+                Updates.set("metadata", metadataDoc),
+                Updates.set("updateTime", getCurrentTime())
+        );
+
+        UpdateOptions options = new UpdateOptions().upsert(false);
+        try {
+
+            UpdateResult result = collection.updateOne(query, updates, options);
+
+            log.info("Modified document count: " + result.getModifiedCount());
+            log.info("Upserted id: " + result.getUpsertedId());
+            if (result.getModifiedCount() <= 0) {
+                throw new RuntimeException("unable to associate auth user with a user");
+            }
+
+            // Prints a message if any exceptions occur during the operation
+        } catch (MongoException e) {
+            log.error("Unable to update due to an error", e);
+            throw new RuntimeException(e);
+        }
+    }
+
     public Optional<User> getUserWithAuthId(String authUserId) {
         MongoCollection<Document> collection = getCollection();
         // Creates instructions to project two document fields

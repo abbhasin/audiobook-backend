@@ -19,14 +19,16 @@ public class PostsController {
 
     @PostMapping("/posts/initialization")
     @ResponseBody
-    public PostInitResponse initPost(@RequestBody PostInitRequest postInitReq) {
-        return oneGodService.initPosts(postInitReq);
+    public PostInitResponse initPost(@RequestHeader("user-auth-token") String userAuthToken,
+                                     @RequestBody PostInitRequest postInitReq) {
+        return oneGodService.initPosts(userAuthToken, postInitReq);
     }
 
     @PostMapping("/posts/update-completion")
     @ResponseBody
-    public PostCompletionResponse postUploadUpdatePost(@RequestBody PostContentUploadReq postContentUploadReq) {
-        return oneGodService.postUploadUpdatePost(postContentUploadReq);
+    public PostCompletionResponse postUploadUpdatePost(@RequestHeader("user-auth-token") String userAuthToken,
+                                                       @RequestBody PostContentUploadReq postContentUploadReq) {
+        return oneGodService.postUploadUpdatePost(userAuthToken, postContentUploadReq);
     }
 
     @GetMapping("/posts/mandir/{mandirId}")
