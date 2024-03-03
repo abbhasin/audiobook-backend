@@ -138,6 +138,31 @@ public class FollowingsDao extends BaseDao {
         return followings;
     }
 
+    public boolean isUserFollowing(String userId, String followeeId, FollowingType followingType) {
+        MongoCollection<Document> collection = getCollection();
+
+        FindIterable<Document> docs = collection.find(
+                Filters.and(
+                        eq("followerUserId", new ObjectId(userId)),
+                        eq("followeeId", new ObjectId(followeeId)),
+                        eq("isDeleted", false)
+                )
+        );
+
+        List<Following> followings = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                return true;
+            }
+        }
+
+        log.info("followings for user:{} followee:{} are:{}", userId, followeeId, followings);
+
+        return false;
+    }
+
     public int countFollowingsForFollowee(String followeeId, FollowingType followingType) {
         MongoCollection<Document> collection = getCollection();
 

@@ -1,9 +1,6 @@
 package com.enigma.audiobook.backend.dao;
 
-import com.enigma.audiobook.backend.models.ContentUploadStatus;
-import com.enigma.audiobook.backend.models.Post;
-import com.enigma.audiobook.backend.models.PostAssociationType;
-import com.enigma.audiobook.backend.models.PostType;
+import com.enigma.audiobook.backend.models.*;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
@@ -280,8 +277,6 @@ public class PostsDao extends BaseDao {
                 Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
         );
 
-
-
         Bson idFilter;
         switch (associationType) {
             case MANDIR:
@@ -393,6 +388,24 @@ public class PostsDao extends BaseDao {
         }
 
         return posts;
+    }
+
+    public int countPostsForInfluencer(String influencerId) {
+        MongoCollection<Document> collection = getCollection();
+
+        Bson associationFilter = Filters.eq("associatedInfluencerId", new ObjectId(influencerId));;
+        Bson fromUserIdFilter = Filters.eq("fromUserId", new ObjectId(influencerId));
+
+        Bson contentFilterProcessed = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+
+        Bson filter = Filters.and(Filters.or(associationFilter, fromUserIdFilter), contentFilterProcessed);
+
+        long count = collection.countDocuments(filter);
+
+        return (int) count;
     }
 
     private static Bson getFinalFilter(PostType postType, Optional<String> lastPostId) {

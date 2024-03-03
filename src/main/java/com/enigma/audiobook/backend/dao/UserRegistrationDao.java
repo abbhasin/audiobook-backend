@@ -86,7 +86,8 @@ public class UserRegistrationDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(userId));
 
-        User.Metadata metadata = getUser(userId).get().getMetadata();
+        User user = getUser(userId).get();
+        User.Metadata metadata = user.getMetadata() != null ? user.getMetadata() : new User.Metadata();
         metadata.setUnassociatedAuthUserId(unAssociatedAuthUserId);
 
         Document metadataDoc = Document.parse(serde.toJson(metadata));

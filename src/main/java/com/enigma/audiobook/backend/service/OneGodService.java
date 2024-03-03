@@ -263,6 +263,7 @@ public class OneGodService {
                     InfluencerForUser influencerForUser = new InfluencerForUser();
                     influencerForUser.setInfluencer(influencer);
                     influencerForUser.setFollowed(followedInfluencerIds.contains(influencer.getUserId()));
+                    influencerForUser.setNumOfPosts(postsDao.countPostsForInfluencer(userId));
                     return influencerForUser;
                 }).toList();
     }
@@ -287,7 +288,10 @@ public class OneGodService {
 
     public PostInitResponse initPosts(String userAuthToken, PostInitRequest postInitReq) {
 //        checkUserHasFirebaseAuth(postInitReq.getPost().getFromUserId());
-        checkUserTokenIsValid(postInitReq.getPost().getFromUserId(), userAuthToken);
+        validateUserTokenIsValid(postInitReq.getPost().getFromUserId(), userAuthToken);
+        validateUserPermissionForPost(
+                postInitReq.getPost().getFromUserId(),
+                postInitReq.getPost());
 
         if (postInitReq.getPost().getType() == null) {
             postInitReq.getPost().setType(PostType.TEXT);
@@ -365,7 +369,10 @@ public class OneGodService {
 
     public PostCompletionResponse postUploadUpdatePost(String userAuthToken, PostContentUploadReq postContentUploadReq) {
 //        checkUserHasFirebaseAuth(postContentUploadReq.getPost().getFromUserId());
-        checkUserTokenIsValid(postContentUploadReq.getPost().getFromUserId(), userAuthToken);
+        validateUserTokenIsValid(postContentUploadReq.getPost().getFromUserId(), userAuthToken);
+        validateUserPermissionForPost(
+                postContentUploadReq.getPost().getFromUserId(),
+                postContentUploadReq.getPost());
 
         Optional<Post> post = postsDao.getPost(postContentUploadReq.getPost().getPostId());
         Preconditions.checkState(post.isPresent());
@@ -469,6 +476,7 @@ public class OneGodService {
         mandirFeedHeader.setDescription(mandir.get().getDescription());
         mandirFeedHeader.setImageUrls(mandir.get().getImageUrl());
         mandirFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
+        mandirFeedHeader.setCurrentUserFollowing(followingsDao.isUserFollowing(forUserId, mandirId, FollowingType.MANDIR));
 
         int followingCount = followingsDao.countFollowingsForFollowee(mandirId, FollowingType.MANDIR);
         mandirFeedHeader.setFollowersCount(followingCount);
@@ -525,6 +533,7 @@ public class OneGodService {
         godFeedHeader.setDescription(god.get().getDescription());
         godFeedHeader.setImageUrls(god.get().getImageUrl());
         godFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
+        godFeedHeader.setCurrentUserFollowing(followingsDao.isUserFollowing(forUserId, godId, FollowingType.GOD));
 
         int followingCount = followingsDao.countFollowingsForFollowee(godId, FollowingType.GOD);
         godFeedHeader.setFollowersCount(followingCount);
@@ -594,6 +603,10 @@ public class OneGodService {
         influencerFeedHeader.setDescription(influencer.get().getDescription());
         influencerFeedHeader.setImageUrls(influencer.get().getImageUrl());
         influencerFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
+        influencerFeedHeader.setCurrentUserFollowing(
+                followingsDao.isUserFollowing(forUserId,
+                influencerId, FollowingType.INFLUENCER));
+
 
         int followingCount = followingsDao.countFollowingsForFollowee(influencerId, FollowingType.INFLUENCER);
         influencerFeedHeader.setFollowersCount(followingCount);
@@ -830,23 +843,73 @@ public class OneGodService {
                 }).toList();
     }
 
+    public List<Page> getAuthorizedPagesForUser(String userId) {
+        List<Page> pages =
+                userAuthDao.getAuthWithAdminPermission(userId)
+                        .stream()
+                        .map(authForUser -> {
+                            Page page = new Page();
+                            switch (authForUser.getAssociationType()) {
+                                case GOD:
+                                    God god = godDao.getGod(authForUser.getResourceId()).get();
+                                    page.setTitle(god.getGodName());
+                                    page.setImageUrl(god.getImageUrl().get(0));
+                                    page.setPageType(PageType.GOD);
+
+                                    MyGodPageInfo myGodPageInfo = new MyGodPageInfo();
+                                    myGodPageInfo.setGodId(god.getGodId());
+
+                                    page.setMyGodPageInfo(myGodPageInfo);
+                                    break;
+                                case MANDIR:
+                                    Mandir mandir = mandirDao.getMandir(authForUser.getResourceId()).get();
+                                    page.setTitle(mandir.getName());
+                                    page.setImageUrl(mandir.getImageUrl().get(0));
+                                    page.setPageType(PageType.MANDIR);
+
+                                    MyMandirPageInfo myMandirPageInfo = new MyMandirPageInfo();
+                                    myMandirPageInfo.setMandirId(mandir.getMandirId());
+
+                                    page.setMyMandirPageInfo(myMandirPageInfo);
+                                    break;
+                                case INFLUENCER:
+                                    Influencer influencer = influencerDao.getInfleuncer(authForUser.getResourceId()).get();
+                                    page.setTitle(influencer.getName());
+                                    page.setImageUrl(influencer.getImageUrl().get(0));
+                                    page.setPageType(PageType.INFLUENCER);
+
+                                    MyInfluencerPageInfo myInfluencerPageInfo =
+                                            new MyInfluencerPageInfo();
+                                    myInfluencerPageInfo.setInfluencerId(influencer.getUserId());
+
+                                    page.setMyInfluencerPageInfo(myInfluencerPageInfo);
+                                    break;
+                                default:
+                                    throw new IllegalStateException("unhandled association type:" + authForUser.getAssociationType());
+                            }
+                            return page;
+                        }).sorted(Comparator.comparing(Page::getPageType))
+                        .toList();
+        return pages;
+    }
+
     public void addMandirAuth(String mandirId, String userId) {
-        checkUserHasFirebaseAuth(userId);
+        validateUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(mandirId, userId, AuthType.ADMIN, AuthAssociationType.MANDIR);
     }
 
     public void addInfluencerAuth(String influencerId, String userId) {
-        checkUserHasFirebaseAuth(userId);
+        validateUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(influencerId, userId, AuthType.ADMIN, AuthAssociationType.INFLUENCER);
     }
 
     public void addGodAuth(String godId, String userId) {
-        checkUserHasFirebaseAuth(userId);
+        validateUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(godId, userId, AuthType.ADMIN, AuthAssociationType.GOD);
     }
 
     public List<Mandir> getAuthorizedMandirForUser(String userId) {
-        checkUserHasFirebaseAuth(userId);
+        validateUserHasFirebaseAuth(userId);
         return userAuthDao.getAuthWithAdminPermission(userId)
                 .stream()
                 .filter(auth -> auth.getAssociationType().equals(AuthAssociationType.MANDIR))
@@ -1167,7 +1230,7 @@ public class OneGodService {
         Preconditions.checkState(userRegistrationDao.getUser(userId).isPresent());
     }
 
-    private void checkUserHasFirebaseAuth(String userId) {
+    private void validateUserHasFirebaseAuth(String userId) {
         Optional<User> user = userRegistrationDao.getUser(userId);
         if (user.isEmpty() || StringUtils.isEmpty(user.get().getAuthUserId())) {
             String msg = "user is not authorized:" + userId;
@@ -1176,7 +1239,7 @@ public class OneGodService {
         }
     }
 
-    private void checkUserTokenIsValid(String userId, String userAuthToken) {
+    private void validateUserTokenIsValid(String userId, String userAuthToken) {
         Optional<FirebaseClient.FirebaseUserInfo> userInfo =
                 firebaseClient.getUserFromToken(userAuthToken);
 
@@ -1190,5 +1253,29 @@ public class OneGodService {
             log.error(msg);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
         }
+    }
+
+    private void validateUserPermissionForPost(String userId, Post post) {
+        if (!checkUserHasPermissionForResource(userId, post)) {
+            String msg = String.format("user is not authorized userId:%s, post:%s", userId, post);
+            log.error(msg);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
+        }
+    }
+
+    private boolean checkUserHasPermissionForResource(String userId, Post post) {
+        switch (post.getAssociationType()) {
+            case GOD:
+                String godId = post.getAssociatedGodId();
+                return userAuthDao.isUserAuthorized(userId, godId, AuthAssociationType.GOD);
+            case MANDIR:
+                String mandirId = post.getAssociatedMandirId();
+                return userAuthDao.isUserAuthorized(userId, mandirId, AuthAssociationType.MANDIR);
+            case INFLUENCER:
+                String influencerId = post.getAssociatedInfluencerId();
+                return userAuthDao.isUserAuthorized(userId, influencerId, AuthAssociationType.INFLUENCER);
+        }
+
+        return false;
     }
 }

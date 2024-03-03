@@ -38,7 +38,7 @@
         <dependency>
             <groupId>com.enigma.audiobook.models</groupId>
             <artifactId>audiobook-models</artifactId>
-            <version>1.6-SNAPSHOT</version>
+            <version>1.6.2-SNAPSHOT</version>
         </dependency>
 
         <dependency>

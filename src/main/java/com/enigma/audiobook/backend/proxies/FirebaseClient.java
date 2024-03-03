@@ -5,17 +5,21 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.*;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class FirebaseClient {
     private final FirebaseApp app;
     private final FirebaseAuth defaultAuth;
 
     public FirebaseClient() throws IOException {
+        String credFile = System.getenv("GOOGLE_APPLICATION_CREDENTIALS");
+        log.info("cred file:{}", credFile);
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.getApplicationDefault())
                 .setProjectId("enigmaticaudiobook")
