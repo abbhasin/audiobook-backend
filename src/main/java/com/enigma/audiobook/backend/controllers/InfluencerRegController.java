@@ -10,6 +10,7 @@ import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -47,8 +48,14 @@ public class InfluencerRegController {
     @GetMapping("/influencers/users")
     @ResponseBody
     public List<InfluencerForUser> getinfluencersForUser(@RequestParam("limit") int limit,
-                                                         @RequestParam("userId") String userId) {
+                                                         @RequestParam("userId") String userId,
+                                                         @RequestParam(value = "onlyFollowed",
+                                                                 required = false,
+                                                                 defaultValue = "false") boolean onlyFollowed) {
         limit = (limit == 0) ? 10 : limit;
+        if(onlyFollowed) {
+            return oneGodService.getFollowedInfluencersForUser(limit, userId);
+        }
         return oneGodService.getInfluencersForUser(limit, userId);
     }
 
@@ -56,8 +63,14 @@ public class InfluencerRegController {
     @ResponseBody
     public List<InfluencerForUser> getinfluencersForUserNextPage(@RequestParam("limit") int limit,
                                                                  @RequestParam("lastInfluencerId") String lastInfluencerId,
-                                                                 @RequestParam("userId") String userId) {
+                                                                 @RequestParam("userId") String userId,
+                                                                 @RequestParam(value = "onlyFollowed",
+                                                                         required = false,
+                                                                         defaultValue = "false") boolean onlyFollowed) {
         limit = (limit == 0) ? 10 : limit;
+        if(onlyFollowed) {
+            return Collections.emptyList();
+        }
         return oneGodService.getNextPageOfInfluencersForUser(limit, lastInfluencerId, userId);
     }
 

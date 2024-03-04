@@ -10,6 +10,7 @@ import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -46,8 +47,14 @@ public class GodRegistrationController {
     @GetMapping("/gods/users")
     @ResponseBody
     public List<GodForUser> getGodsForUser(@RequestParam("limit") int limit,
-                                           @RequestParam("userId") String userId) {
+                                           @RequestParam("userId") String userId,
+                                           @RequestParam(value = "onlyFollowed",
+                                                   required = false,
+                                                   defaultValue = "false") boolean onlyFollowed) {
         limit = (limit == 0) ? 10 : limit;
+        if (onlyFollowed) {
+            return oneGodService.getFollowedGodsForUser(limit, userId);
+        }
         return oneGodService.getGodsForUser(limit, userId);
     }
 
@@ -55,8 +62,15 @@ public class GodRegistrationController {
     @ResponseBody
     public List<GodForUser> getGodsForUserNextPage(@RequestParam("limit") int limit,
                                                    @RequestParam("lastGodId") String lastGodId,
-                                                   @RequestParam("userId") String userId) {
+                                                   @RequestParam("userId") String userId,
+                                                   @RequestParam(value = "onlyFollowed",
+                                                           required = false,
+                                                           defaultValue = "false") boolean onlyFollowed) {
         limit = (limit == 0) ? 10 : limit;
+        if (onlyFollowed) {
+            return Collections.emptyList();
+            //oneGodService.getFollowedGodsForUser(limit, userId);
+        }
         return oneGodService.getNextPageOfGodsForUser(limit, lastGodId, userId);
     }
 

@@ -10,6 +10,7 @@ import com.enigma.audiobook.backend.service.OneGodService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -38,14 +39,22 @@ public class MandirController {
 
     @GetMapping("/mandirs/users")
     @ResponseBody
-    public List<MandirForUser> getMandirsForUser(@RequestParam("limit") int limit, @RequestParam("userId") String userId) {
+    public List<MandirForUser> getMandirsForUser(@RequestParam("limit") int limit,
+                                                 @RequestParam("userId") String userId,
+                                                 @RequestParam(value = "onlyFollowed",
+                                                         required = false,
+                                                         defaultValue = "false") boolean onlyFollowed) {
         limit = (limit == 0) ? 10 : limit;
+        if(onlyFollowed) {
+            return oneGodService.getFollowedMandirsForUser(limit, userId);
+        }
         return oneGodService.getMandirsForUser(limit, userId);
     }
 
     @GetMapping("/mandirs/pagination")
     @ResponseBody
-    public List<Mandir> getMandirsNextPage(@RequestParam("limit") int limit, @RequestParam("lastMandirId") String lastMandirId) {
+    public List<Mandir> getMandirsNextPage(@RequestParam("limit") int limit,
+                                           @RequestParam("lastMandirId") String lastMandirId) {
         limit = (limit == 0) ? 10 : limit;
         return oneGodService.getMandirsPaginated(limit, lastMandirId);
     }
@@ -54,8 +63,14 @@ public class MandirController {
     @ResponseBody
     public List<MandirForUser> getMandirsForUserNextPage(@RequestParam("limit") int limit,
                                                          @RequestParam("lastMandirId") String lastMandirId,
-                                                         @RequestParam("userId") String userId) {
+                                                         @RequestParam("userId") String userId,
+                                                         @RequestParam(value = "onlyFollowed",
+                                                                 required = false,
+                                                                 defaultValue = "false") boolean onlyFollowed) {
         limit = (limit == 0) ? 10 : limit;
+        if(onlyFollowed) {
+            return Collections.emptyList();
+        }
         return oneGodService.getMandirsForUser(limit, lastMandirId, userId);
     }
 

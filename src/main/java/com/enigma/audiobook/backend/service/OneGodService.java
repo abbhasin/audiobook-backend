@@ -148,6 +148,20 @@ public class OneGodService {
         return godDao.getGodsPaginated(limit, lastGodId);
     }
 
+    public List<GodForUser> getFollowedGodsForUser(int limit, String userId) {
+        List<Following> followings = followingsDao.getFollowingsForUser(userId, FollowingType.GOD);
+        return followings.stream()
+                .map(following -> godDao.getGod(following.getFolloweeId()))
+                .filter(Optional::isPresent)
+                .map(god ->
+                {
+                    GodForUser godForUser = new GodForUser();
+                    godForUser.setGod(god.get());
+                    godForUser.setFollowed(true);
+                    return godForUser;
+                }).toList();
+    }
+
     public List<GodForUser> getGodsForUser(int limit, String userId) {
         Set<String> followedGodIds = getFolloweeIdsForUser(userId, FollowingType.GOD);
 
@@ -252,6 +266,21 @@ public class OneGodService {
 
     public List<Influencer> getNextPageOfInfluencers(int limit, String lastInfluencerId) {
         return influencerDao.getInfleuncersPaginated(limit, lastInfluencerId);
+    }
+
+    public List<InfluencerForUser> getFollowedInfluencersForUser(int limit, String userId) {
+        List<Following> followings = followingsDao.getFollowingsForUser(userId, FollowingType.INFLUENCER);
+        return followings.stream()
+                .map(following -> influencerDao.getInfleuncer(following.getFolloweeId()))
+                .filter(Optional::isPresent)
+                .map(influencer ->
+                {
+                    InfluencerForUser influencerForUser = new InfluencerForUser();
+                    influencerForUser.setInfluencer(influencer.get());
+                    influencerForUser.setFollowed(true);
+                    influencerForUser.setNumOfPosts(postsDao.countPostsForInfluencer(userId));
+                    return influencerForUser;
+                }).toList();
     }
 
     public List<InfluencerForUser> getInfluencersForUser(int limit, String userId) {
@@ -477,6 +506,7 @@ public class OneGodService {
         mandirFeedHeader.setImageUrls(mandir.get().getImageUrl());
         mandirFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
         mandirFeedHeader.setCurrentUserFollowing(followingsDao.isUserFollowing(forUserId, mandirId, FollowingType.MANDIR));
+        mandirFeedHeader.setAddress(mandir.get().getAddress());
 
         int followingCount = followingsDao.countFollowingsForFollowee(mandirId, FollowingType.MANDIR);
         mandirFeedHeader.setFollowersCount(followingCount);
@@ -605,7 +635,7 @@ public class OneGodService {
         influencerFeedHeader.setMyProfilePage(isUserAuthorizedForPosts);
         influencerFeedHeader.setCurrentUserFollowing(
                 followingsDao.isUserFollowing(forUserId,
-                influencerId, FollowingType.INFLUENCER));
+                        influencerId, FollowingType.INFLUENCER));
 
 
         int followingCount = followingsDao.countFollowingsForFollowee(influencerId, FollowingType.INFLUENCER);
@@ -813,6 +843,20 @@ public class OneGodService {
 
     public List<Mandir> getMandirs(int limit) {
         return mandirDao.getMandirs(limit);
+    }
+
+    public List<MandirForUser> getFollowedMandirsForUser(int limit, String userId) {
+        List<Following> followings = followingsDao.getFollowingsForUser(userId, FollowingType.MANDIR);
+        return followings.stream()
+                .map(following -> mandirDao.getMandir(following.getFolloweeId()))
+                .filter(Optional::isPresent)
+                .map(mandir ->
+                {
+                    MandirForUser m = new MandirForUser();
+                    m.setMandir(mandir.get());
+                    m.setFollowed(true);
+                    return m;
+                }).toList();
     }
 
     public List<MandirForUser> getMandirsForUser(int limit, String userId) {
