@@ -49,24 +49,19 @@ public class OneGodService {
     }
 
     public UserAssociationResponse associateAuthenticatedUser(UserRegistrationInfo userRegistrationInfo) {
+        FirebaseClient.FirebaseUserInfo userInfo = validateFirebaseUser(userRegistrationInfo.getAuthUserId());
+
         Optional<User> existingUser = userRegistrationDao.getUserWithAuthId(userRegistrationInfo.getAuthUserId());
         if (existingUser.isPresent()) {
             userRegistrationDao.updateMetadata(userRegistrationInfo.getUserId(),
-                    userRegistrationInfo.getAuthUserId());
+                    userRegistrationInfo.getAuthUserId(), userInfo);
             return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.MAPPED_TO_EXISTING_USER,
                     existingUser.get());
         }
 
-        Optional<FirebaseClient.FirebaseUserInfo> firebaseUserInfo =
-                firebaseClient.getUserInfo(userRegistrationInfo.getAuthUserId());
-
-        if (firebaseUserInfo.isEmpty()) {
-            return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.FAILED_AUTH_USER_NOT_FOUND,
-                    null);
-        }
 
         userRegistrationDao.associateAuthenticatedUser(userRegistrationInfo.getUserId(),
-                userRegistrationInfo.getAuthUserId(), firebaseUserInfo.get().getPhoneNum());
+                userRegistrationInfo.getAuthUserId(), userInfo.getPhoneNum());
 
         User user = userRegistrationDao.getUser(userRegistrationInfo.getUserId()).get();
         return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.MAPPED_TO_GIVEN_USER,
@@ -1272,6 +1267,16 @@ public class OneGodService {
 
     private void checkUserExists(String userId) {
         Preconditions.checkState(userRegistrationDao.getUser(userId).isPresent());
+    }
+
+    private FirebaseClient.FirebaseUserInfo validateFirebaseUser(String firebaseUid) {
+        Optional<FirebaseClient.FirebaseUserInfo> userInfo = firebaseClient.getUserInfo(firebaseUid);
+        if(!userInfo.isPresent() || StringUtils.isEmpty(userInfo.get().getPhoneNum())) {
+            String msg = "user is not authorized:" + firebaseUid;
+            log.error(msg);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
+        }
+        return userInfo.get();
     }
 
     private void validateUserHasFirebaseAuth(String userId) {

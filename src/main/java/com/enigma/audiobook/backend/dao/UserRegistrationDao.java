@@ -1,6 +1,7 @@
 package com.enigma.audiobook.backend.dao;
 
 import com.enigma.audiobook.backend.models.User;
+import com.enigma.audiobook.backend.proxies.FirebaseClient;
 import com.mongodb.MongoException;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -17,6 +18,8 @@ import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -55,13 +58,27 @@ public class UserRegistrationDao extends BaseDao {
 
 
     public void associateAuthenticatedUser(String userId, String authUserId, String phoneNumber) {
+
+        User user = getUser(userId).get();
+
+        User.Metadata metadata = user.getMetadata() != null ? user.getMetadata() : new User.Metadata();
+        List<String> otherAuths = metadata.getOtherAuthUserIds() != null ? metadata.getOtherAuthUserIds() : new ArrayList<>();
+        otherAuths.add(authUserId);
+        metadata.setOtherAuthUserIds(otherAuths);
+
+        List<String> userDetails = metadata.getUserDetails() != null ? metadata.getUserDetails() : new ArrayList<>();
+        userDetails.add(phoneNumber);
+        metadata.setUserDetails(userDetails);
+
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(userId));
 
+        Document metadataDoc = Document.parse(serde.toJson(metadata));
         Bson updates = Updates.combine(
                 Updates.set("authUserId", authUserId),
                 Updates.set("phoneNumber", phoneNumber),
-                Updates.set("updateTime", getCurrentTime())
+                Updates.set("updateTime", getCurrentTime()),
+                Updates.set("metadata", metadataDoc)
         );
 
         UpdateOptions options = new UpdateOptions().upsert(false);
@@ -82,15 +99,24 @@ public class UserRegistrationDao extends BaseDao {
         }
     }
 
-    public void updateMetadata(String userId, String unAssociatedAuthUserId) {
+    public void updateMetadata(String userId, String unAssociatedAuthUserId,
+                               FirebaseClient.FirebaseUserInfo userInfo) {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(userId));
 
         User user = getUser(userId).get();
+
         User.Metadata metadata = user.getMetadata() != null ? user.getMetadata() : new User.Metadata();
-        metadata.setUnassociatedAuthUserId(unAssociatedAuthUserId);
+        List<String> otherAuths = metadata.getOtherAuthUserIds() != null ? metadata.getOtherAuthUserIds() : new ArrayList<>();
+        otherAuths.add(unAssociatedAuthUserId);
+        metadata.setOtherAuthUserIds(otherAuths);
+
+        List<String> userDetails = metadata.getUserDetails() != null ? metadata.getUserDetails() : new ArrayList<>();
+        userDetails.add(userInfo.getPhoneNum());
+        metadata.setUserDetails(userDetails);
 
         Document metadataDoc = Document.parse(serde.toJson(metadata));
+        log.info("metadata doc:{}", metadataDoc);
         Bson updates = Updates.combine(
                 Updates.set("metadata", metadataDoc),
                 Updates.set("updateTime", getCurrentTime())
