@@ -1,0 +1,6 @@
+env:
+  profile: prod
+
+mongo:
+  url: mongodb://127.0.1.1:27018/?directConnection=true&serverSelectionTimeoutMS=2000&appName=service
+  database: prod
