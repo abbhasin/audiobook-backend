@@ -5,6 +5,7 @@ import com.enigma.audiobook.backend.dao.PostsDao;
 import com.enigma.audiobook.backend.jobs.ContentEncoderV2;
 import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Post;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -19,8 +20,17 @@ public class PostsContentTransformer extends BaseContentTransformer {
     final PostsDao postsDao;
     Post post;
 
-    public PostsContentTransformer(S3Proxy s3Proxy, PostsDao postsDao) {
-        super(s3Proxy);
+    public PostsContentTransformer(S3Proxy s3Proxy, PostsDao postsDao,
+                                   @Value("${s3-config.bucket_url}") String bucket_url,
+                                   @Value("${s3-config.bucket}") String bucket,
+                                   @Value("${content-transformer-config.inputContentLocalFilePathPrefixWOScheme}")
+                                   String inputContentLocalFilePathPrefixWOScheme,
+                                   @Value("${content-transformer-config.outputContentLocalFilePathPrefixWOScheme}")
+                                   String outputContentLocalFilePathPrefixWOScheme) {
+        super(bucket_url, bucket,
+                inputContentLocalFilePathPrefixWOScheme,
+                outputContentLocalFilePathPrefixWOScheme,
+                s3Proxy);
         this.postsDao = postsDao;
         this.post = null;
     }

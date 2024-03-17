@@ -17,14 +17,13 @@ import java.util.Optional;
 @Slf4j
 @AllArgsConstructor
 public abstract class BaseContentTransformer {
-    static String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
-    static String bucket = "one-god-dev";
 //    static String inputContentLocalFilePathPrefix = "file:///Users/akhil/Downloads/tmp/one-god-local/input";
 //    static String outputContentLocalFilePathPrefix = "file:///Users/akhil/Downloads/tmp/one-god-local/output";
 
-    static String inputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/input";
-    static String outputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/output";
-
+    String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
+    String bucket = "one-god-dev";
+    String inputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/input";
+    String outputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/output";
     S3Proxy s3Proxy;
 
 

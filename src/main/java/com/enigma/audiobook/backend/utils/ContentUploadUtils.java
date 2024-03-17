@@ -17,6 +17,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -25,16 +26,24 @@ import java.util.*;
 @Slf4j
 @Component
 public class ContentUploadUtils {
-    @Autowired
-    S3UploadHandler uploadHandler;
-
-    static String bucket = "one-god-dev";
-    public static String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
     public static String key_format = "test-upload/ID-%s/%s";
     static long ONE_MB = 1024 * 1024;
     static long ONE_GB = ONE_MB * 1024;
     static long allowed_size = 500 * ONE_MB;
     static long chunk_size = 5 * ONE_MB;
+
+
+    S3UploadHandler uploadHandler;
+    String bucket = "one-god-dev";
+    String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
+
+    public ContentUploadUtils(@Autowired S3UploadHandler uploadHandler,
+                              @Value("${s3-config.bucket_url}") String bucket_url,
+                              @Value("${s3-config.bucket}") String bucket) {
+        this.uploadHandler = uploadHandler;
+        this.bucket = bucket;
+        this.bucket_url = bucket_url;
+    }
 
     public String getObjectUrl(String objectKey) {
         return String.format("%s/%s", bucket_url, objectKey);

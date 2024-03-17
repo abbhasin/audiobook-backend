@@ -4,3 +4,11 @@ env:
 mongo:
   url: mongodb://127.0.1.1:27018/?directConnection=true&serverSelectionTimeoutMS=2000&appName=service
   database: prod
+
+s3-config:
+  bucket: one-god-dev
+  bucket_url: https://one-god-dev.s3.ap-south-1.amazonaws.com
+
+content-transformer-config:
+  inputContentLocalFilePathPrefixWOScheme: /tmp/one-god-local/input
+  outputContentLocalFilePathPrefixWOScheme: /tmp/one-god-local/output

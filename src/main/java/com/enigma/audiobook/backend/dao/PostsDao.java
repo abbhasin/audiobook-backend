@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Sorts.ascending;
 import static com.mongodb.client.model.Sorts.descending;
 
 @Slf4j
@@ -347,7 +348,7 @@ public class PostsDao extends BaseDao {
                     Filters.or(contentFilterProcessed, contentFilterRaw));
         }
 
-        if(lastPostId.isPresent()) {
+        if (lastPostId.isPresent()) {
             filter = Filters.and(
                     filter,
                     lt("_id", new ObjectId(lastPostId.get()))
@@ -372,7 +373,13 @@ public class PostsDao extends BaseDao {
 
     public List<Post> getPostsByType(PostType postType, int limit, Optional<String> lastPostId) {
         MongoCollection<Document> collection = getCollection();
-        Bson finalFilter = getFinalFilter(postType, lastPostId);
+
+        Bson contentFilter = Filters.or(
+                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
+                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
+        );
+
+        Bson finalFilter = getFinalFilter(postType, lastPostId, contentFilter, false);
 
         FindIterable<Document> docs = collection.find(finalFilter)
                 .sort(descending("_id")) // _id contains the create time as well
@@ -390,10 +397,34 @@ public class PostsDao extends BaseDao {
         return posts;
     }
 
+    public List<Post> getPostsByTypeAndStatus(PostType postType, int limit,
+                                              Optional<String> lastPostId,
+                                              ContentUploadStatus status) {
+        MongoCollection<Document> collection = getCollection();
+        Bson contentFilter = Filters.eq("contentUploadStatus", status.name());
+        Bson finalFilter = getFinalFilter(postType, lastPostId, contentFilter, true);
+
+        FindIterable<Document> docs = collection.find(finalFilter)
+                .sort(ascending("_id")) // _id contains the create time as well
+                .limit(limit);
+
+        List<Post> posts = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                posts.add(serde.fromJson(doc.toJson(), Post.class));
+            }
+        }
+
+        return posts;
+    }
+
     public int countPostsForInfluencer(String influencerId) {
         MongoCollection<Document> collection = getCollection();
 
-        Bson associationFilter = Filters.eq("associatedInfluencerId", new ObjectId(influencerId));;
+        Bson associationFilter = Filters.eq("associatedInfluencerId", new ObjectId(influencerId));
+        ;
         Bson fromUserIdFilter = Filters.eq("fromUserId", new ObjectId(influencerId));
 
         Bson contentFilterProcessed = Filters.or(
@@ -408,20 +439,21 @@ public class PostsDao extends BaseDao {
         return (int) count;
     }
 
-    private static Bson getFinalFilter(PostType postType, Optional<String> lastPostId) {
-        Bson contentFilter = Filters.or(
-                Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
-                Filters.eq("contentUploadStatus", ContentUploadStatus.SUCCESS_NO_CONTENT)
-        );
+    private static Bson getFinalFilter(PostType postType, Optional<String> lastPostId, Bson contentFilter,
+                                       boolean isAscending) {
+
         Bson postTypeFilter = Filters.eq("type", postType.name());
-        ;
+
         Bson finalFilter = Filters.and(
                 contentFilter,
                 postTypeFilter
         );
 
         if (lastPostId.isPresent()) {
-            Bson postIdFilter = lt("_id", new ObjectId(lastPostId.get()));
+            Bson postIdFilter = isAscending ?
+                    gt("_id", new ObjectId(lastPostId.get())) :
+                    lt("_id", new ObjectId(lastPostId.get()));
+
             finalFilter = Filters.and(finalFilter, postIdFilter);
         }
         return finalFilter;

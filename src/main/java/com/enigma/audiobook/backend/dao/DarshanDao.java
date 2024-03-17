@@ -190,6 +190,27 @@ public class DarshanDao extends BaseDao {
         return darshans;
     }
 
+    public List<Darshan> getDarshanByStatus(ContentUploadStatus status,
+                                            int limit) {
+        MongoCollection<Document> collection = getCollection();
+        Bson filter = Filters.eq("videoUploadStatus", status.name());
+
+        FindIterable<Document> docs = collection.find(filter)
+                .sort(ascending("_id"))
+                .limit(limit);
+
+        List<Darshan> darshans = new ArrayList<>();
+
+        try (MongoCursor<Document> iter = docs.iterator()) {
+            while (iter.hasNext()) {
+                Document doc = iter.next();
+                darshans.add(serde.fromJson(doc.toJson(), Darshan.class));
+            }
+        }
+
+        return darshans;
+    }
+
     private MongoCollection<Document> getCollection() {
         MongoDatabase db = mongoClient.getDatabase(database);
         return db.getCollection(DARSHAN_REG_COLLECTION);

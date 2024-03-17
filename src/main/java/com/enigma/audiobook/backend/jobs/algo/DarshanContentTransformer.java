@@ -5,6 +5,7 @@ import com.enigma.audiobook.backend.dao.DarshanDao;
 import com.enigma.audiobook.backend.jobs.ContentEncoderV2;
 import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Darshan;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -18,8 +19,17 @@ public class DarshanContentTransformer extends BaseContentTransformer {
     final DarshanDao darshanDao;
     Darshan darshan;
 
-    public DarshanContentTransformer(S3Proxy s3Proxy, DarshanDao darshanDao) {
-        super(s3Proxy);
+    public DarshanContentTransformer(S3Proxy s3Proxy, DarshanDao darshanDao,
+                                     @Value("${s3-config.bucket_url}") String bucket_url,
+                                     @Value("${s3-config.bucket}") String bucket,
+                                     @Value("${content-transformer-config.inputContentLocalFilePathPrefixWOScheme}")
+                                     String inputContentLocalFilePathPrefixWOScheme,
+                                     @Value("${content-transformer-config.outputContentLocalFilePathPrefixWOScheme}")
+                                     String outputContentLocalFilePathPrefixWOScheme) {
+        super(bucket_url, bucket,
+                inputContentLocalFilePathPrefixWOScheme,
+                outputContentLocalFilePathPrefixWOScheme,
+                s3Proxy);
         this.darshanDao = darshanDao;
     }
 
