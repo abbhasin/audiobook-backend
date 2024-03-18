@@ -6,9 +6,7 @@ import com.enigma.audiobook.backend.models.ScoredContent;
 import com.enigma.audiobook.backend.models.View;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
@@ -106,6 +104,19 @@ public class NewPostsDao extends BaseDao {
         }
 
         return views;
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(NEW_POSTS_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(NEW_POSTS_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("post_type_and_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.descending("postType", "postId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

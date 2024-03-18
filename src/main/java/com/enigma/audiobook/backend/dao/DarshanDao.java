@@ -4,9 +4,7 @@ import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Darshan;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -209,6 +207,37 @@ public class DarshanDao extends BaseDao {
         }
 
         return darshans;
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(DARSHAN_REG_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(DARSHAN_REG_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("god_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.ascending("godId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("mandir_id_index");
+        resultCreateIndex = collection.createIndex(Indexes.ascending("mandirId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("content_status_index");
+        resultCreateIndex = collection.createIndex(Indexes.ascending("videoUploadStatus"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("mandir_and_god_index");
+        resultCreateIndex = collection.createIndex(Indexes.ascending("godId", "mandirId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

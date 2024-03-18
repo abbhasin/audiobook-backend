@@ -7,6 +7,8 @@ import com.enigma.audiobook.backend.models.MandirAuth;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.result.InsertOneResult;
 import lombok.extern.slf4j.Slf4j;
@@ -80,10 +82,30 @@ public class UserAuthDao extends BaseDao {
                 eq("userId", new ObjectId(userId)),
                 eq("resourceId", new ObjectId(resourceId)),
                 eq("associationType", associationType.name()),
-                eq("authType", AuthType.ADMIN.name()));
+                eq("authType", AuthType.ADMIN.name()),
+                eq("isDeleted", false));
 
         Document doc = collection.find(filter).first();
         return doc != null && !doc.isEmpty();
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(USER_AUTH_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(USER_AUTH_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("user_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.ascending("authType", "userId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("user_and_resource_id_index");
+        resultCreateIndex = collection.createIndex(Indexes.ascending("authType", "userId", "resourceId", "associationType"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

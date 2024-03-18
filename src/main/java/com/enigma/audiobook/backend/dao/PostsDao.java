@@ -3,9 +3,7 @@ package com.enigma.audiobook.backend.dao;
 import com.enigma.audiobook.backend.models.*;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -437,6 +435,43 @@ public class PostsDao extends BaseDao {
         long count = collection.countDocuments(filter);
 
         return (int) count;
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(POSTS_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(POSTS_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("mandir_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "associatedMandirId", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("god_id_index");
+        resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "associatedGodId", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("influencer_id_index");
+        resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "associatedInfluencerId", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("fromUserId_index");
+        resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "fromUserId", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("postType_index");
+        resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "type", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private static Bson getFinalFilter(PostType postType, Optional<String> lastPostId, Bson contentFilter,

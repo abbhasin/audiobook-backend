@@ -4,10 +4,7 @@ import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.God;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -194,6 +191,12 @@ public class GodDao extends BaseDao {
         }
     }
 
+    public void initCollectionAndIndexes(String collectionName) {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(GOD_REG_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(GOD_REG_COLLECTION);
+    }
 
     private MongoCollection<Document> getCollection() {
         MongoDatabase db = mongoClient.getDatabase(database);

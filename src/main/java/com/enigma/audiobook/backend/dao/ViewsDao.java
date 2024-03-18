@@ -3,9 +3,7 @@ package com.enigma.audiobook.backend.dao;
 import com.enigma.audiobook.backend.models.View;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -174,6 +172,25 @@ public class ViewsDao extends BaseDao {
         }
 
         return views;
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(VIEWS_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(VIEWS_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("post_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.descending("postId", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("user_id_and_update_time_index");
+        resultCreateIndex = collection.createIndex(Indexes.descending("userId", "updateTime", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

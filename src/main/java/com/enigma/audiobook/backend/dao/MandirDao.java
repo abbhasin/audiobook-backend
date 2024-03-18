@@ -5,10 +5,7 @@ import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Mandir;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -184,6 +181,13 @@ public class MandirDao extends BaseDao {
         } else {
             return Optional.of(serde.fromJson(doc.toJson(), Mandir.class));
         }
+    }
+
+    public void initCollectionAndIndexes(String collectionName) {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(MANDIR_REG_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(MANDIR_REG_COLLECTION);
     }
 
     private MongoCollection<Document> getCollection() {

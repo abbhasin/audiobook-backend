@@ -4,6 +4,8 @@ import com.mongodb.MongoException;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
@@ -64,6 +66,19 @@ public class CollectionConfigDao extends BaseDao {
         } else {
             return Optional.of(doc.getString("value"));
         }
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(COLLECTION_CONFIG_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(COLLECTION_CONFIG_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("key_index");
+        String resultCreateIndex = collection.createIndex(Indexes.ascending("key"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

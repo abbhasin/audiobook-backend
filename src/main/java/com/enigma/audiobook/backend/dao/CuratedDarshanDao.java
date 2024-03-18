@@ -4,6 +4,8 @@ import com.enigma.audiobook.backend.models.CuratedDarshan;
 import com.enigma.audiobook.backend.models.Influencer;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.result.InsertOneResult;
 import lombok.extern.slf4j.Slf4j;
@@ -80,6 +82,13 @@ public class CuratedDarshanDao extends BaseDao {
         } else {
             return Optional.of(serde.fromJson(doc.toJson(), CuratedDarshan.class));
         }
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(CURATED_DARSHAN_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(CURATED_DARSHAN_COLLECTION);
     }
 
     private MongoCollection<Document> getCollection() {

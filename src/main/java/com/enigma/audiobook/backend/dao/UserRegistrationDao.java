@@ -6,9 +6,7 @@ import com.mongodb.MongoException;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -167,6 +165,25 @@ public class UserRegistrationDao extends BaseDao {
         } else {
             return Optional.of(serde.fromJson(doc.toJson(), User.class));
         }
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(USER_REG_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(USER_REG_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("auth_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.ascending("authUserId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("phone_num_index");
+        resultCreateIndex = collection.createIndex(Indexes.ascending("phoneNumber"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

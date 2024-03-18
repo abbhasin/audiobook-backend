@@ -4,9 +4,7 @@ import com.enigma.audiobook.backend.models.Following;
 import com.enigma.audiobook.backend.models.FollowingType;
 import com.mongodb.MongoException;
 import com.mongodb.client.*;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import lombok.extern.slf4j.Slf4j;
@@ -198,6 +196,25 @@ public class FollowingsDao extends BaseDao {
         }
 
         return followings;
+    }
+
+    public void initCollectionAndIndexes(String collectionName) {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(FOLLOWINGS_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(FOLLOWINGS_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("follower_id_index");
+        String resultCreateIndex = collection.createIndex(Indexes.ascending("followerUserId", "followingType"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("followee_id_index");
+        resultCreateIndex = collection.createIndex(Indexes.ascending("followeeId", "followingType"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {
