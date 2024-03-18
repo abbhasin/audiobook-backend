@@ -227,4 +227,26 @@ public class S3Proxy {
         DeleteObjectResponse response = s3Client.deleteObject(deleteObjectRequest);
     }
 
+    public void markForExpiration(String s3ObjectUri) {
+        URI uri = URI.create(s3ObjectUri);
+        String objectKey = uri.getPath().substring(1); // remove the prefix '/'
+
+        int firstDotIndex = uri.getAuthority().indexOf(".");
+        String bucket = uri.getAuthority();
+        if (firstDotIndex != -1) {
+            bucket = uri.getAuthority().substring(0, firstDotIndex);
+        }
+
+        Tag tag = Tag.builder().key("lifecycle-policy-category").value("marked-for-deletion").build();
+        Tagging tagging = Tagging.builder().tagSet(tag).build();
+        PutObjectTaggingRequest objectTaggingRequest =
+                PutObjectTaggingRequest.builder()
+                        .bucket(bucket)
+                        .key(objectKey)
+                        .tagging(tagging)
+                        .build();
+
+        s3Client.putObjectTagging(objectTaggingRequest);
+    }
+
 }

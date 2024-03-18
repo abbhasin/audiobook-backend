@@ -4,7 +4,6 @@ import com.enigma.audiobook.backend.aws.S3Proxy;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.math3.util.Pair;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,7 +27,8 @@ public abstract class BaseContentTransformer {
 
 
     protected void handleContent(List<String> inputContentUrls, String outputS3KeyFormat) {
-
+        List<String> inputDirs = new ArrayList<>();
+        List<String> outputDirs = new ArrayList<>();
         try {
             for (String inputContentUrl : inputContentUrls) {
                 URI inputContentURI = URI.create(inputContentUrl);
@@ -45,12 +45,14 @@ public abstract class BaseContentTransformer {
                 log.info("inputContentLocalFilePathDir:{}", inputContentLocalFilePathDir);
 
                 createDir(inputContentLocalFilePathDir);
+                inputDirs.add(inputContentLocalFilePathDir);
                 s3Proxy.getObject(inputContentUrl, new File(inputContentLocalFilePath).toURI());
 
                 String outputDir = String.format(outputContentLocalFilePathPrefixWOScheme + "/%s",
                         inputContentURI.getPath().substring(1, inputContentURI.getPath().lastIndexOf("/"))); // remove prefix '/'
                 log.info("outputDir:{}", outputDir);
                 createDir(outputDir);
+                outputDirs.add(outputDir);
 
                 // create HLS files
                 encodeContentToDir(inputContentLocalFilePathWOScheme, outputDir);
@@ -76,15 +78,15 @@ public abstract class BaseContentTransformer {
             throw new RuntimeException(e);
         } finally {
             // remove staged data
-            removeStagedData(inputContentLocalFilePathPrefixWOScheme);
-            removeStagedData(outputContentLocalFilePathPrefixWOScheme);
+            removeStagedData(inputDirs);
+            removeStagedData(outputDirs);
         }
     }
 
     private void createDir(String dir) {
         File file = new File(dir);
-        boolean dirCreated = file.mkdirs();
         file.deleteOnExit();
+        boolean dirCreated = file.mkdirs();
         log.info("dirCreated:{}, exists:{}", dirCreated, file.exists());
         if (!file.exists()) {
             throw new IllegalStateException("unable to create dir:" + dir);
@@ -92,20 +94,22 @@ public abstract class BaseContentTransformer {
 
     }
 
-    private void removeStagedData(String dir) {
-        File f = new File(dir);
-        f.deleteOnExit();
-        try {
-            FileUtils.deleteDirectory(f);
-        } catch (IOException e) {
-            log.error("unable to delete dir:" + dir, e);
-            // throw new RuntimeException(e);
+    private void removeStagedData(List<String> dirs) {
+        for (String dir : dirs) {
+            File f = new File(dir);
+            f.deleteOnExit();
+            try {
+                FileUtils.deleteDirectory(f);
+            } catch (IOException e) {
+                log.error("unable to delete dir:" + dir, e);
+                // throw new RuntimeException(e);
+            }
         }
     }
 
     private void removeFromS3(List<String> inputContentUrls) {
         for (String inputUri : inputContentUrls) {
-            s3Proxy.deleteObject(inputUri);
+            s3Proxy.markForExpiration(inputUri);
         }
     }
 
