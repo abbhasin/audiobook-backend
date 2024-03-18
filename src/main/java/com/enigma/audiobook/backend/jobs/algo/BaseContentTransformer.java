@@ -84,6 +84,7 @@ public abstract class BaseContentTransformer {
     private void createDir(String dir) {
         File file = new File(dir);
         boolean dirCreated = file.mkdirs();
+        file.deleteOnExit();
         log.info("dirCreated:{}, exists:{}", dirCreated, file.exists());
         if (!file.exists()) {
             throw new IllegalStateException("unable to create dir:" + dir);

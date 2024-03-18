@@ -40,13 +40,15 @@ public class ContentEncodingScheduler implements Runnable {
         this.contentEncodingHandler = contentEncodingHandler;
         this.db = db;
         this.jobQueue = new JobQueue();
+    }
 
+    public void start() {
         for (int i = 0; i < jobRunnableSize; i++) {
             jobRunnableExecutors.submit(
                     new JobRunnable(jobQueue, contentEncodingHandler, db, postsDao, darshanDao));
         }
 
-        scheduler.scheduleWithFixedDelay(this, 1, 10, TimeUnit.MINUTES);
+        scheduler.scheduleWithFixedDelay(this, 1, 5, TimeUnit.MINUTES);
     }
 
 
