@@ -14,8 +14,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.springframework.stereotype.Repository;
 
-import javax.print.Doc;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -27,7 +27,8 @@ public class ScoredContentDao extends BaseDao {
 
     private final MongoClient mongoClient;
     private final String database;
-    private static final String SCORED_CONTENT_COLLECTION_FORMAT = "scoredContent_%s";
+    private static final String COLLECTION_NAME_PREFIX = "scoredContent";
+    private static final String SCORED_CONTENT_COLLECTION_FORMAT = COLLECTION_NAME_PREFIX + "_%s";
 
     public ScoredContentDao(MongoClient mongoClient, String database) {
         this.mongoClient = mongoClient;
@@ -132,6 +133,30 @@ public class ScoredContentDao extends BaseDao {
         String resultCreateIndex = collection.createIndex(Indexes.descending("score", "postId"),
                 indexOptions);
         log.info(String.format("Index created: %s", resultCreateIndex));
+    }
+
+    public List<String> listCollections() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        Iterator<String> iter = db.listCollectionNames().iterator();
+        List<String> collectionNames = new ArrayList<>();
+
+        while (iter.hasNext()) {
+            String collectionName = iter.next();
+            if (collectionName.startsWith(COLLECTION_NAME_PREFIX)) {
+                collectionNames.add(collectionName);
+            }
+
+        }
+        return collectionNames;
+    }
+
+    public void dropCollections(List<String> collectionNames) {
+        List<String> collectionNamesFinal =
+                collectionNames.stream()
+                        .filter(name -> name.startsWith(COLLECTION_NAME_PREFIX))
+                        .toList();
+        MongoDatabase db = mongoClient.getDatabase(database);
+        collectionNamesFinal.forEach(name -> db.getCollection(name).drop());
     }
 
     private MongoCollection<Document> getCollectionByName(String collectionName) {

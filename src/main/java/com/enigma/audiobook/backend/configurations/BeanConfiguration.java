@@ -4,10 +4,14 @@ import com.enigma.audiobook.backend.dao.*;
 import com.enigma.audiobook.backend.models.MandirAuth;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 @Configuration
 @ComponentScan(basePackages = "com.enigma.audiobook.backend")
@@ -88,5 +92,11 @@ public class BeanConfiguration {
     @Bean
     public MandirAuthDao mandirAuthDao(MongoClient mongoClient, @Value("${mongo.database}") String database) {
         return new MandirAuthDao(mongoClient, database);
+    }
+
+    @Bean
+    @Qualifier(value = "appJobsScheduler")
+    public ScheduledExecutorService appJobsScheduler() {
+        return Executors.newScheduledThreadPool(5);
     }
 }
