@@ -16,7 +16,8 @@ public class Application {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationStarted() {
-        contentEncodingScheduler.start();
+
+//        contentEncodingScheduler.start();
     }
 
     // every day at 10pm

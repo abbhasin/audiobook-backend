@@ -46,7 +46,7 @@ public class S3Proxy {
                 PutObjectPresignRequest
                         .builder()
                         .putObjectRequest(putObjectRequest)
-                        .signatureDuration(Duration.ofMinutes(10))
+                        .signatureDuration(Duration.ofMinutes(150))
                         .build();
 
         PresignedPutObjectRequest presignedPutObjectRequest =
@@ -136,7 +136,7 @@ public class S3Proxy {
         UploadPartPresignRequest upPresignReq =
                 UploadPartPresignRequest
                         .builder()
-                        .signatureDuration(Duration.ofMinutes(10))
+                        .signatureDuration(Duration.ofMinutes(150))
                         .uploadPartRequest(uploadPartRequest)
                         .build();
         PresignedUploadPartRequest presignedUploadPartRequest =

@@ -1,29 +1,38 @@
 package com.enigma.audiobook.backend.jobs.algo;
 
 import com.enigma.audiobook.backend.aws.S3Proxy;
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 @Slf4j
-@AllArgsConstructor
 public abstract class BaseContentTransformer {
 //    static String inputContentLocalFilePathPrefix = "file:///Users/akhil/Downloads/tmp/one-god-local/input";
 //    static String outputContentLocalFilePathPrefix = "file:///Users/akhil/Downloads/tmp/one-god-local/output";
 
-    String bucket_url = "https://one-god-dev.s3.ap-south-1.amazonaws.com";
-    String bucket = "one-god-dev";
-    String inputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/input";
-    String outputContentLocalFilePathPrefixWOScheme = "/Users/akhil/Downloads/tmp/one-god-local/output";
-    S3Proxy s3Proxy;
+    final String bucketUrl;
+    final String bucket;
+    final String inputContentLocalFilePathPrefixWOScheme;
+    final String outputContentLocalFilePathPrefixWOScheme;
+    final S3Proxy s3Proxy;
+
+    protected BaseContentTransformer(String bucketUrl, String bucket, String inputContentLocalFilePathPrefixWOScheme, String outputContentLocalFilePathPrefixWOScheme, S3Proxy s3Proxy) {
+        this.bucketUrl = bucketUrl;
+        this.bucket = bucket;
+        this.inputContentLocalFilePathPrefixWOScheme = inputContentLocalFilePathPrefixWOScheme;
+        this.outputContentLocalFilePathPrefixWOScheme = outputContentLocalFilePathPrefixWOScheme;
+        this.s3Proxy = s3Proxy;
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            public void run() {
+                log.info("running shutdown hook for encoder");
+                removeStagedData(Arrays.asList(inputContentLocalFilePathPrefixWOScheme, outputContentLocalFilePathPrefixWOScheme));
+            }
+        });
+    }
 
 
     protected void handleContent(List<String> inputContentUrls, String outputS3KeyFormat) {
@@ -122,6 +131,6 @@ public abstract class BaseContentTransformer {
     protected abstract void addToUploadsList(String fileName, String s3ObjectURL);
 
     public String getObjectUrl(String objectKey) {
-        return String.format("%s/%s", bucket_url, objectKey);
+        return String.format("%s/%s", bucketUrl, objectKey);
     }
 }
