@@ -95,6 +95,11 @@ public class BeanConfiguration {
     }
 
     @Bean
+    public UserFeaturesDao userFeaturesDao(MongoClient mongoClient, @Value("${mongo.database}") String database) {
+        return new UserFeaturesDao(mongoClient, database);
+    }
+
+    @Bean
     @Qualifier(value = "appJobsScheduler")
     public ScheduledExecutorService appJobsScheduler() {
         return Executors.newScheduledThreadPool(5);

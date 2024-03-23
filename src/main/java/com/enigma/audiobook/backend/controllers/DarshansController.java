@@ -21,14 +21,18 @@ public class DarshansController {
 
     @PostMapping("/darshans/initialization")
     @ResponseBody
-    public DarshanInitResponse initDarshan(@RequestBody DarshanInitRequest darshanInitRequest) {
-        return oneGodService.initDarshan(darshanInitRequest);
+    public DarshanInitResponse initDarshan(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody DarshanInitRequest darshanInitRequest) {
+        return oneGodService.initDarshan(darshanInitRequest, registrationToken);
     }
 
     @PostMapping("/darshans/update-completion")
     @ResponseBody
-    public DarshanCompletionResponse postUploadUpdateDarshan(@RequestBody DarshanContentUploadReq darshanContentUploadReq) {
-        return oneGodService.postUploadUpdateDarshan(darshanContentUploadReq);
+    public DarshanCompletionResponse postUploadUpdateDarshan(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody DarshanContentUploadReq darshanContentUploadReq) {
+        return oneGodService.postUploadUpdateDarshan(darshanContentUploadReq, registrationToken);
     }
 
     @GetMapping("/darshans")

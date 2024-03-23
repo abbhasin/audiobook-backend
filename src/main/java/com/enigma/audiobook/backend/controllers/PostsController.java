@@ -7,10 +7,12 @@ import com.enigma.audiobook.backend.models.requests.PostInitRequest;
 import com.enigma.audiobook.backend.models.responses.PostCompletionResponse;
 import com.enigma.audiobook.backend.models.responses.PostInitResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class PostsController {
@@ -20,15 +22,19 @@ public class PostsController {
     @PostMapping("/posts/initialization")
     @ResponseBody
     public PostInitResponse initPost(@RequestHeader("user-auth-token") String userAuthToken,
-                                     @RequestBody PostInitRequest postInitReq) {
-        return oneGodService.initPosts(userAuthToken, postInitReq);
+                                     @RequestBody PostInitRequest postInitReq,
+                                     @RequestHeader Map<String, String> headers,
+                                     HttpServletRequest servletRequest) {
+        return oneGodService.initPosts(userAuthToken, postInitReq, headers, servletRequest.getRemoteAddr());
     }
 
     @PostMapping("/posts/update-completion")
     @ResponseBody
     public PostCompletionResponse postUploadUpdatePost(@RequestHeader("user-auth-token") String userAuthToken,
-                                                       @RequestBody PostContentUploadReq postContentUploadReq) {
-        return oneGodService.postUploadUpdatePost(userAuthToken, postContentUploadReq);
+                                                       @RequestBody PostContentUploadReq postContentUploadReq,
+                                                       @RequestHeader Map<String, String> headers,
+                                                       HttpServletRequest servletRequest) {
+        return oneGodService.postUploadUpdatePost(userAuthToken, postContentUploadReq, headers, servletRequest.getRemoteAddr());
     }
 
     @GetMapping("/posts/mandir/{mandirId}")

@@ -20,14 +20,18 @@ public class GodRegistrationController {
 
     @PostMapping("/gods/initialization")
     @ResponseBody
-    public GodInitResponse initGod(@RequestBody GodInitRequest godInitRequest) {
-        return oneGodService.initGod(godInitRequest);
+    public GodInitResponse initGod(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody GodInitRequest godInitRequest) {
+        return oneGodService.initGod(godInitRequest, registrationToken);
     }
 
     @PostMapping("/gods/update-completion")
     @ResponseBody
-    public GodCompletionResponse postUploadUpdateGod(@RequestBody GodContentUploadReq godContentUploadReq) {
-        return oneGodService.postUploadUpdateGod(godContentUploadReq);
+    public GodCompletionResponse postUploadUpdateGod(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody GodContentUploadReq godContentUploadReq) {
+        return oneGodService.postUploadUpdateGod(godContentUploadReq, registrationToken);
     }
 
     @GetMapping("/gods")

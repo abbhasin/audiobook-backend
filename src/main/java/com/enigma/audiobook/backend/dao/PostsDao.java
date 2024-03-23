@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.*;
@@ -37,7 +38,7 @@ public class PostsDao extends BaseDao {
         return id.toString();
     }
 
-    public Post initPost(Post post, String postId) {
+    public Post initPost(Post post, String postId, Map<String, String> initMetadata) {
         MongoCollection<Document> collection = getCollection();
         try {
             ObjectId id = new ObjectId(postId);
@@ -52,7 +53,9 @@ public class PostsDao extends BaseDao {
             Document doc = Document.parse(serde.toJson(post))
                     .append("_id", id)
                     .append("createTime", getCurrentTime())
-                    .append("updateTime", getCurrentTime());
+                    .append("updateTime", getCurrentTime())
+                    .append("initMetadata", initMetadata)
+                    .append("isDeleted", false);
             switch (post.getAssociationType()) {
                 case MANDIR:
                     doc.append("associatedMandirId", new ObjectId(post.getAssociatedMandirId()));
@@ -85,13 +88,14 @@ public class PostsDao extends BaseDao {
         }
     }
 
-    public Post updatePostStatus(String postId, ContentUploadStatus status) {
+    public Post updatePostStatus(String postId, ContentUploadStatus status, Map<String, String> completeUploadMetadata) {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(postId));
 
         Bson updates =
                 Updates.combine(
                         Updates.set("contentUploadStatus", status.name()),
+                        Updates.set("completeUploadMetadata", completeUploadMetadata),
                         Updates.set("updateTime", getCurrentTime()));
         UpdateOptions options = new UpdateOptions().upsert(false);
 
@@ -119,7 +123,7 @@ public class PostsDao extends BaseDao {
 
         Bson statusUpdate = Updates.combine(
                 Updates.set("contentUploadStatus", status.name()),
-                Updates.set("updateTime", getCurrentTime()));
+                Updates.set("updateHLSTime", getCurrentTime()));
         Bson updates;
         switch (postType) {
             case VIDEO:
@@ -185,7 +189,7 @@ public class PostsDao extends BaseDao {
 
         Bson fromUserIdFilter = eq("fromUserId", new ObjectId(influencerId));
         Bson influencerIdFilter = eq("associatedInfluencerId", new ObjectId(influencerId));
-        Bson filter = Filters.or(fromUserIdFilter, influencerIdFilter);
+        Bson filter = Filters.and(Filters.eq("isDeleted", false), Filters.or(fromUserIdFilter, influencerIdFilter));
 
         Bson contentFilter = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
@@ -231,7 +235,7 @@ public class PostsDao extends BaseDao {
 
         Bson godIdFilter = eq("associatedGodId", new ObjectId(godId));
         Bson godNameTagFilter = eq("tag", godName);
-        Bson filter = Filters.or(godIdFilter, godNameTagFilter);
+        Bson filter = Filters.and(getIsDeletedFilter(false), Filters.or(godIdFilter, godNameTagFilter));
 
         Bson contentFilterProcessed = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
@@ -292,8 +296,11 @@ public class PostsDao extends BaseDao {
         }
         Bson filter = Filters.and(
                 idFilter,
-                contentFilter
+                contentFilter,
+                getIsDeletedFilter(false)
         );
+
+        log.info("getPosts by association filter:" + filter);
 
         FindIterable<Document> docs = collection.find(filter)
                 .sort(descending("_id")) // _id contains the create time as well
@@ -307,6 +314,7 @@ public class PostsDao extends BaseDao {
                 posts.add(serde.fromJson(doc.toJson(), Post.class));
             }
         }
+        log.info("getPosts by association posts:" + posts.stream().map(Post::getPostId).toList());
 
         return posts;
     }
@@ -330,7 +338,7 @@ public class PostsDao extends BaseDao {
                 throw new IllegalStateException("unhandled association type:" + associationType);
         }
 
-        Bson filter = associationIdFilter;
+        Bson filter = Filters.and(getIsDeletedFilter(false), associationIdFilter);
 
         Bson contentFilterProcessed = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
@@ -378,6 +386,7 @@ public class PostsDao extends BaseDao {
         );
 
         Bson finalFilter = getFinalFilter(postType, lastPostId, contentFilter, false);
+        finalFilter = Filters.and(getIsDeletedFilter(false), finalFilter);
 
         FindIterable<Document> docs = collection.find(finalFilter)
                 .sort(descending("_id")) // _id contains the create time as well
@@ -401,6 +410,7 @@ public class PostsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
         Bson contentFilter = Filters.eq("contentUploadStatus", status.name());
         Bson finalFilter = getFinalFilter(postType, lastPostId, contentFilter, true);
+        finalFilter = Filters.and(getIsDeletedFilter(false), finalFilter);
 
         FindIterable<Document> docs = collection.find(finalFilter)
                 .sort(ascending("_id")) // _id contains the create time as well
@@ -431,6 +441,7 @@ public class PostsDao extends BaseDao {
         );
 
         Bson filter = Filters.and(Filters.or(associationFilter, fromUserIdFilter), contentFilterProcessed);
+        filter = Filters.and(getIsDeletedFilter(false), filter);
 
         long count = collection.countDocuments(filter);
 
@@ -472,6 +483,14 @@ public class PostsDao extends BaseDao {
         resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "type", "_id"),
                 indexOptions);
         log.info(String.format("Index created: %s", resultCreateIndex));
+    }
+
+    private Bson getIsDeletedFilter(boolean isDeleted) {
+        if (!isDeleted) {
+            return Filters.or(Filters.exists("isDeleted", isDeleted), Filters.eq("isDeleted", isDeleted));
+        }
+
+        return Filters.eq("isDeleted", isDeleted);
     }
 
     private static Bson getFinalFilter(PostType postType, Optional<String> lastPostId, Bson contentFilter,

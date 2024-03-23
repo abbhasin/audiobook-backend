@@ -20,14 +20,18 @@ public class InfluencerRegController {
 
     @PostMapping("/influencer/initialization")
     @ResponseBody
-    public InfluencerInitResponse initInfluencer(@RequestBody InfluencerInitRequest influencerInitRequest) {
-        return oneGodService.initInfluencer(influencerInitRequest);
+    public InfluencerInitResponse initInfluencer(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody InfluencerInitRequest influencerInitRequest) {
+        return oneGodService.initInfluencer(influencerInitRequest, registrationToken);
     }
 
     @PostMapping("/influencers/update-completion")
     @ResponseBody
-    public InfluencerCompletionResponse postUploadUpdateInfluencer(@RequestBody InfluencerContentUploadReq influencerContentUploadReq) {
-        return oneGodService.postUploadUpdateInfluencer(influencerContentUploadReq);
+    public InfluencerCompletionResponse postUploadUpdateInfluencer(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody InfluencerContentUploadReq influencerContentUploadReq) {
+        return oneGodService.postUploadUpdateInfluencer(influencerContentUploadReq, registrationToken);
     }
 
     @GetMapping("/influencers")

@@ -7,6 +7,7 @@ import com.enigma.audiobook.backend.aws.models.MPURequestStatus;
 import com.enigma.audiobook.backend.aws.models.S3MPUCompletedPart;
 import com.enigma.audiobook.backend.models.requests.*;
 import com.enigma.audiobook.backend.models.responses.*;
+import com.enigma.audiobook.backend.service.OneGodService;
 import com.enigma.audiobook.backend.utils.ContentUploadUtils;
 import com.google.common.base.Preconditions;
 import lombok.extern.slf4j.Slf4j;
@@ -30,12 +31,18 @@ public class UploadController {
     ContentUploadUtils contentUploadUtils;
 
     @Autowired
+    OneGodService oneGodService;
+
+    @Autowired
     S3Proxy s3Proxy;
 
     @PostMapping("/uploads/init")
     @ResponseBody
-    public UploadInitRes initUpload(@RequestBody UploadInitReq uploadInitReq) {
+    public UploadInitRes initUpload(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody UploadInitReq uploadInitReq) {
         log.info("upload init request:" + uploadInitReq);
+        oneGodService.checkValidRegistrationToken(registrationToken);
         UploadInitRes initRes = new UploadInitRes();
         initRes.setRequestStatus(MPURequestStatus.COMPLETED);
 
@@ -61,7 +68,10 @@ public class UploadController {
 
     @PostMapping("/uploads/completion")
     @ResponseBody
-    public UploadCompletionRes completeUpload(@RequestBody UploadCompletionReq uploadCompletionReq) {
+    public UploadCompletionRes completeUpload(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody UploadCompletionReq uploadCompletionReq) {
+        oneGodService.checkValidRegistrationToken(registrationToken);
         UploadCompletionRes res = new UploadCompletionRes();
         res.setRequestStatus(MPURequestStatus.COMPLETED);
 
@@ -87,7 +97,9 @@ public class UploadController {
 
     @PostMapping("/uploads/parts")
     @ResponseBody
-    public UploadPartsResponse uploadParts(@RequestBody UploadPartsRequest request) {
+    public UploadPartsResponse uploadParts(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody UploadPartsRequest request) {
         List<S3MPUCompletedPart> completedParts =
                 S3MPUClientMain.uploadParts(request.getS3MPUPreSignedUrlsResponse(), new File(request.getFilePath()));
         UploadPartsResponse response = new UploadPartsResponse();

@@ -43,9 +43,21 @@ public class OneGodService {
     private final CollectionConfigDao collectionConfigDao;
     private final ContentUploadUtils contentUploadUtils;
     private final FirebaseClient firebaseClient;
+    private final UserFeaturesDao userFeaturesDao;
+    private volatile String registrationToken;
 
     public User createUser() {
-        return userRegistrationDao.registerNewUser();
+        User user = userRegistrationDao.registerNewUser();
+        userFeaturesDao.addOrUpdateUserFeature(user.getUserId(), UserFeaturesDao.UserFeature.SWIPE_DARSHAN_PUG_ANIMATION, true);
+        return user;
+    }
+
+    public void swipedDarshansAtLeastOnce(String userId) {
+        userFeaturesDao.addOrUpdateUserFeature(userId, UserFeaturesDao.UserFeature.SWIPE_DARSHAN_PUG_ANIMATION, false);
+    }
+
+    public boolean isSwipedDarshansPugAnimationEnabled(String userId) {
+        return userFeaturesDao.isFeatureEnabled(userId, UserFeaturesDao.UserFeature.SWIPE_DARSHAN_PUG_ANIMATION);
     }
 
     public UserAssociationResponse associateAuthenticatedUser(UserRegistrationInfo userRegistrationInfo) {
@@ -72,7 +84,8 @@ public class OneGodService {
         return userRegistrationDao.getUser(userId).orElse(null);
     }
 
-    public GodInitResponse initGod(GodInitRequest godInitRequest) {
+    public GodInitResponse initGod(GodInitRequest godInitRequest, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         String id = godDao.generateId();
 
         UploadInitReq uploadInitReq = godInitRequest.getUploadInitReq();
@@ -107,7 +120,8 @@ public class OneGodService {
         return new GodInitResponse(godResponse, initRes);
     }
 
-    public GodCompletionResponse postUploadUpdateGod(GodContentUploadReq godContentUploadReq) {
+    public GodCompletionResponse postUploadUpdateGod(GodContentUploadReq godContentUploadReq, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         Optional<God> god = godDao.getGod(godContentUploadReq.getGod().getGodId());
         Preconditions.checkState(god.isPresent());
         Preconditions.checkState(godContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() <= 10);
@@ -188,7 +202,8 @@ public class OneGodService {
     }
 
 
-    public InfluencerInitResponse initInfluencer(InfluencerInitRequest influencerInitRequest) {
+    public InfluencerInitResponse initInfluencer(InfluencerInitRequest influencerInitRequest, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         String id = influencerDao.generateId();
 
         UploadInitReq uploadInitReq = influencerInitRequest.getUploadInitReq();
@@ -226,7 +241,8 @@ public class OneGodService {
         return new InfluencerInitResponse(influencerResp, initRes);
     }
 
-    public InfluencerCompletionResponse postUploadUpdateInfluencer(InfluencerContentUploadReq influencerContentUploadReq) {
+    public InfluencerCompletionResponse postUploadUpdateInfluencer(InfluencerContentUploadReq influencerContentUploadReq, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         Optional<Influencer> influencer = influencerDao.getInfleuncer(influencerContentUploadReq.getInfluencer().getUserId());
         Preconditions.checkState(influencer.isPresent());
         Preconditions.checkState(influencerContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() <= 10);
@@ -310,7 +326,7 @@ public class OneGodService {
     }
 
 
-    public PostInitResponse initPosts(String userAuthToken, PostInitRequest postInitReq) {
+    public PostInitResponse initPosts(String userAuthToken, PostInitRequest postInitReq, Map<String, String> headers, String remoteAddr) {
 //        checkUserHasFirebaseAuth(postInitReq.getPost().getFromUserId());
         validateUserTokenIsValid(postInitReq.getPost().getFromUserId(), userAuthToken);
         validateUserPermissionForPost(
@@ -386,12 +402,26 @@ public class OneGodService {
             }
         }
 
-        Post post = postsDao.initPost(postInitReq.getPost(), id);
+        Map<String, String> initMetadata = getHeadersMetadata(headers, remoteAddr);
+
+        Post post = postsDao.initPost(postInitReq.getPost(), id, initMetadata);
         return new PostInitResponse(post, initRes);
     }
 
+    private Map<String, String> getHeadersMetadata(Map<String, String> headers, String remoteAddr) {
+        String realIp = Optional.ofNullable(headers.get("X-Real-Ip")).orElse("");
+        String forwardedIp = Optional.ofNullable(headers.get("X-Forwarded-For")).orElse("");
+        String remoteIp = Optional.ofNullable(remoteAddr).orElse("");
 
-    public PostCompletionResponse postUploadUpdatePost(String userAuthToken, PostContentUploadReq postContentUploadReq) {
+        Map<String, String> metadataMap = new HashMap<>();
+        metadataMap.put("realIp", realIp);
+        metadataMap.put("forwardedIp", forwardedIp);
+        metadataMap.put("remoteIp", remoteIp);
+        return metadataMap;
+    }
+
+
+    public PostCompletionResponse postUploadUpdatePost(String userAuthToken, PostContentUploadReq postContentUploadReq, Map<String, String> headers, String remoteAddr) {
 //        checkUserHasFirebaseAuth(postContentUploadReq.getPost().getFromUserId());
         validateUserTokenIsValid(postContentUploadReq.getPost().getFromUserId(), userAuthToken);
         validateUserPermissionForPost(
@@ -450,9 +480,9 @@ public class OneGodService {
         if (!uploadCompletionRes.getRequestStatus().equals(MPURequestStatus.COMPLETED)) {
             return new PostCompletionResponse(postContentUploadReq.getPost(), uploadCompletionRes);
         }
-
+        Map<String, String> completeUploadMetadata = getHeadersMetadata(headers, remoteAddr);
         Post completePost = postsDao.updatePostStatus(postContentUploadReq.getPost().getPostId(),
-                contentUploadStatus);
+                contentUploadStatus, completeUploadMetadata);
         return new PostCompletionResponse(completePost, uploadCompletionRes);
     }
 
@@ -672,7 +702,8 @@ public class OneGodService {
         return postsDao.getPostForInfluencer(id, limit, Optional.ofNullable(lastPostId), onlyProcessed);
     }
 
-    public DarshanInitResponse initDarshan(DarshanInitRequest darshanInitRequest) {
+    public DarshanInitResponse initDarshan(DarshanInitRequest darshanInitRequest, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         darshanInitRequest.getDarshan().setVideoUploadStatus(ContentUploadStatus.PENDING);
         String id = darshanDao.generateId();
 
@@ -706,7 +737,8 @@ public class OneGodService {
         return new DarshanInitResponse(darshanRes, initRes);
     }
 
-    public DarshanCompletionResponse postUploadUpdateDarshan(DarshanContentUploadReq darshanContentUploadReq) {
+    public DarshanCompletionResponse postUploadUpdateDarshan(DarshanContentUploadReq darshanContentUploadReq, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         Optional<Darshan> darshan = darshanDao.getDarshan(darshanContentUploadReq.getDarshan().getDarshanId());
         Preconditions.checkState(darshan.isPresent());
         Preconditions.checkState(darshanContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() == 1);
@@ -764,7 +796,8 @@ public class OneGodService {
         return darshans;
     }
 
-    public MandirInitResponse initMandir(MandirInitRequest mandirInitRequest) {
+    public MandirInitResponse initMandir(MandirInitRequest mandirInitRequest, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         String id = influencerDao.generateId();
 
         UploadInitReq uploadInitReq = mandirInitRequest.getUploadInitReq();
@@ -803,7 +836,8 @@ public class OneGodService {
     }
 
 
-    public MandirCompletionResponse postUploadUpdateMandir(MandirContentUploadReq mandirContentUploadReq) {
+    public MandirCompletionResponse postUploadUpdateMandir(MandirContentUploadReq mandirContentUploadReq, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         Optional<Mandir> mandir = mandirDao.getMandir(mandirContentUploadReq.getMandir().getMandirId());
         Preconditions.checkState(mandir.isPresent());
         Preconditions.checkState(mandirContentUploadReq.getUploadCompletionReq().getUploadFileCompletionReqs().size() <= 10);
@@ -1271,7 +1305,7 @@ public class OneGodService {
 
     private FirebaseClient.FirebaseUserInfo validateFirebaseUser(String firebaseUid) {
         Optional<FirebaseClient.FirebaseUserInfo> userInfo = firebaseClient.getUserInfo(firebaseUid);
-        if(!userInfo.isPresent() || StringUtils.isEmpty(userInfo.get().getPhoneNum())) {
+        if (!userInfo.isPresent() || StringUtils.isEmpty(userInfo.get().getPhoneNum())) {
             String msg = "user is not authorized:" + firebaseUid;
             log.error(msg);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
@@ -1326,5 +1360,21 @@ public class OneGodService {
         }
 
         return false;
+    }
+
+    public void checkValidRegistrationToken(String regToken) {
+        if (StringUtils.isEmpty(this.registrationToken)) {
+            this.registrationToken = getRegistrationToken();
+        }
+
+        if (StringUtils.isEmpty(registrationToken) || !this.registrationToken.equals(regToken)) {
+            String msg = String.format("user is not authorized for registration");
+            log.error(msg);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, msg);
+        }
+    }
+
+    private String getRegistrationToken() {
+        return System.getenv("APP_REGISTRATION_TOKEN");
     }
 }

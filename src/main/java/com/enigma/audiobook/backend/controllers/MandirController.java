@@ -20,14 +20,18 @@ public class MandirController {
 
     @PostMapping("/mandirs/initialization")
     @ResponseBody
-    public MandirInitResponse initMandir(@RequestBody MandirInitRequest mandirInitRequest) {
-        return oneGodService.initMandir(mandirInitRequest);
+    public MandirInitResponse initMandir(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody MandirInitRequest mandirInitRequest) {
+        return oneGodService.initMandir(mandirInitRequest, registrationToken);
     }
 
     @PostMapping("/mandirs/update-completion")
     @ResponseBody
-    public MandirCompletionResponse postUploadUpdateMandir(@RequestBody MandirContentUploadReq mandirContentUploadReq) {
-        return oneGodService.postUploadUpdateMandir(mandirContentUploadReq);
+    public MandirCompletionResponse postUploadUpdateMandir(
+            @RequestHeader("registration-token") String registrationToken,
+            @RequestBody MandirContentUploadReq mandirContentUploadReq) {
+        return oneGodService.postUploadUpdateMandir(mandirContentUploadReq, registrationToken);
     }
 
     @GetMapping("/mandirs")
