@@ -76,7 +76,7 @@ public class ViewsDao extends BaseDao {
             log.info("Modified document count: " + result.getModifiedCount());
             log.info("Upserted id: " + result.getUpsertedId());
             if (result.getModifiedCount() <= 0 && result.getUpsertedId() == null) {
-                throw new RuntimeException("unable to associate auth user with a user");
+                throw new RuntimeException("unable to upsert view:" + view);
             }
         } catch (MongoException e) {
             log.error("Unable to update due to an error", e);

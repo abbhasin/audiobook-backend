@@ -39,6 +39,7 @@ public class OneGodService {
     private final FollowingsDao followingsDao;
     private final ScoredContentDao scoredContentDao;
     private final ViewsDao viewsDao;
+    private final DarshanViewsDao darshanViewsDao;
     private final NewPostsDao newPostsDao;
     private final CollectionConfigDao collectionConfigDao;
     private final ContentUploadUtils contentUploadUtils;
@@ -1290,6 +1291,10 @@ public class OneGodService {
 
     public void addViewForUser(View view) {
         viewsDao.upsertView(view);
+    }
+
+    public void addDarshanViewForUser(DarshanView darshanView) {
+        darshanViewsDao.upsertView(darshanView);
     }
 
     private Set<String> getFolloweeIdsForUser(String userId, FollowingType followingType) {

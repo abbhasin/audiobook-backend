@@ -100,6 +100,11 @@ public class BeanConfiguration {
     }
 
     @Bean
+    public DarshanViewsDao darshanViewsDao(MongoClient mongoClient, @Value("${mongo.database}") String database) {
+        return new DarshanViewsDao(mongoClient, database);
+    }
+
+    @Bean
     @Qualifier(value = "appJobsScheduler")
     public ScheduledExecutorService appJobsScheduler() {
         return Executors.newScheduledThreadPool(5);
