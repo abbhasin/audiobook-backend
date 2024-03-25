@@ -18,6 +18,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -36,13 +37,14 @@ public class UserRegistrationDao extends BaseDao {
         this.database = database;
     }
 
-    public User registerNewUser() {
+    public User registerNewUser(Map<String, String> initUserMetadata) {
         MongoCollection<Document> collection = getCollection();
         try {
             InsertOneResult result = collection.insertOne(new Document()
                     .append("_id", new ObjectId())
                     .append("createTime", getCurrentTime())
                     .append("updateTime", getCurrentTime())
+                    .append("initUserMetadata", initUserMetadata)
                     .append("isDeleted", false));
 
             log.info("Success! Inserted document id: " + result.getInsertedId());
@@ -55,7 +57,7 @@ public class UserRegistrationDao extends BaseDao {
     }
 
 
-    public void associateAuthenticatedUser(String userId, String authUserId, String phoneNumber) {
+    public void associateAuthenticatedUser(String userId, String authUserId, String phoneNumber, Map<String, String> associateUserMetadata) {
 
         User user = getUser(userId).get();
 
@@ -76,6 +78,7 @@ public class UserRegistrationDao extends BaseDao {
                 Updates.set("authUserId", authUserId),
                 Updates.set("phoneNumber", phoneNumber),
                 Updates.set("updateTime", getCurrentTime()),
+                Updates.set("associateUserMetadata", associateUserMetadata),
                 Updates.set("metadata", metadataDoc)
         );
 
@@ -98,7 +101,7 @@ public class UserRegistrationDao extends BaseDao {
     }
 
     public void updateMetadata(String userId, String unAssociatedAuthUserId,
-                               FirebaseClient.FirebaseUserInfo userInfo) {
+                               FirebaseClient.FirebaseUserInfo userInfo, Map<String, String> associateUserMetadata) {
         MongoCollection<Document> collection = getCollection();
         Document query = new Document().append("_id", new ObjectId(userId));
 
@@ -117,6 +120,7 @@ public class UserRegistrationDao extends BaseDao {
         log.info("metadata doc:{}", metadataDoc);
         Bson updates = Updates.combine(
                 Updates.set("metadata", metadataDoc),
+                Updates.set("associateUserMetadata", associateUserMetadata),
                 Updates.set("updateTime", getCurrentTime())
         );
 

@@ -47,8 +47,9 @@ public class OneGodService {
     private final UserFeaturesDao userFeaturesDao;
     private volatile String registrationToken;
 
-    public User createUser() {
-        User user = userRegistrationDao.registerNewUser();
+    public User createUser(Map<String, String> headers, String remoteAddr) {
+        Map<String, String> initUserMetadata = getHeadersMetadata(headers, remoteAddr);
+        User user = userRegistrationDao.registerNewUser(initUserMetadata);
         userFeaturesDao.addOrUpdateUserFeature(user.getUserId(), UserFeaturesDao.UserFeature.SWIPE_DARSHAN_PUG_ANIMATION, true);
         return user;
     }
@@ -61,20 +62,20 @@ public class OneGodService {
         return userFeaturesDao.isFeatureEnabled(userId, UserFeaturesDao.UserFeature.SWIPE_DARSHAN_PUG_ANIMATION);
     }
 
-    public UserAssociationResponse associateAuthenticatedUser(UserRegistrationInfo userRegistrationInfo) {
+    public UserAssociationResponse associateAuthenticatedUser(UserRegistrationInfo userRegistrationInfo, Map<String, String> headers, String remoteAddr) {
         FirebaseClient.FirebaseUserInfo userInfo = validateFirebaseUser(userRegistrationInfo.getAuthUserId());
 
+        Map<String, String> associateUserMetadata = getHeadersMetadata(headers, remoteAddr);
         Optional<User> existingUser = userRegistrationDao.getUserWithAuthId(userRegistrationInfo.getAuthUserId());
         if (existingUser.isPresent()) {
             userRegistrationDao.updateMetadata(userRegistrationInfo.getUserId(),
-                    userRegistrationInfo.getAuthUserId(), userInfo);
+                    userRegistrationInfo.getAuthUserId(), userInfo, associateUserMetadata);
             return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.MAPPED_TO_EXISTING_USER,
                     existingUser.get());
         }
 
-
         userRegistrationDao.associateAuthenticatedUser(userRegistrationInfo.getUserId(),
-                userRegistrationInfo.getAuthUserId(), userInfo.getPhoneNum());
+                userRegistrationInfo.getAuthUserId(), userInfo.getPhoneNum(), associateUserMetadata);
 
         User user = userRegistrationDao.getUser(userRegistrationInfo.getUserId()).get();
         return new UserAssociationResponse(UserAssociationResponse.UserAssociationStatus.MAPPED_TO_GIVEN_USER,
@@ -967,17 +968,20 @@ public class OneGodService {
         return pages;
     }
 
-    public void addMandirAuth(String mandirId, String userId) {
+    public void addMandirAuth(String mandirId, String userId, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         validateUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(mandirId, userId, AuthType.ADMIN, AuthAssociationType.MANDIR);
     }
 
-    public void addInfluencerAuth(String influencerId, String userId) {
+    public void addInfluencerAuth(String influencerId, String userId, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         validateUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(influencerId, userId, AuthType.ADMIN, AuthAssociationType.INFLUENCER);
     }
 
-    public void addGodAuth(String godId, String userId) {
+    public void addGodAuth(String godId, String userId, String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
         validateUserHasFirebaseAuth(userId);
         userAuthDao.addUserAuth(godId, userId, AuthType.ADMIN, AuthAssociationType.GOD);
     }
@@ -1295,6 +1299,24 @@ public class OneGodService {
 
     public void addDarshanViewForUser(DarshanView darshanView) {
         darshanViewsDao.upsertView(darshanView);
+    }
+
+    public void initCollsAndIndexes(String registrationToken) {
+        checkValidRegistrationToken(registrationToken);
+
+        collectionConfigDao.initCollectionAndIndexes();
+        curatedDarshanDao.initCollectionAndIndexes();
+        darshanDao.initCollectionAndIndexes();
+        darshanViewsDao.initCollectionAndIndexes();
+        followingsDao.initCollectionAndIndexes();
+        godDao.initCollectionAndIndexes();
+        influencerDao.initCollectionAndIndexes();
+        mandirDao.initCollectionAndIndexes();
+        newPostsDao.initCollectionAndIndexes();
+        postsDao.initCollectionAndIndexes();
+        userAuthDao.initCollectionAndIndexes();
+        userFeaturesDao.initCollectionAndIndexes();
+        userRegistrationDao.initCollectionAndIndexes();
     }
 
     private Set<String> getFolloweeIdsForUser(String userId, FollowingType followingType) {

@@ -4,6 +4,8 @@ import com.mongodb.MongoException;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
@@ -33,6 +35,7 @@ public class UserFeaturesDao extends BaseDao {
         Document query = new Document().append("userId", new ObjectId(userId));
 
         Bson updates = Updates.combine(
+                Updates.set("userId", userId),
                 Updates.set(featureKey.name(), featureEnabledValue),
                 Updates.set("updateTime", getCurrentTime())
         );
@@ -63,6 +66,20 @@ public class UserFeaturesDao extends BaseDao {
         } else {
             return doc.getBoolean(featureKey.name(), false);
         }
+    }
+
+    public void initCollectionAndIndexes() {
+        MongoDatabase db = mongoClient.getDatabase(database);
+        db.createCollection(USER_FEAT_COLLECTION);
+
+        MongoCollection<Document> collection = db.getCollection(USER_FEAT_COLLECTION);
+
+        IndexOptions indexOptions = new IndexOptions()
+                .name("userId_index")
+                .unique(true);
+        String resultCreateIndex = collection.createIndex(Indexes.descending("userId"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
     }
 
     private MongoCollection<Document> getCollection() {

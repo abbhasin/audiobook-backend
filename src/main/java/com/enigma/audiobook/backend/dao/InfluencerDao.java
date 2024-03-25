@@ -181,14 +181,15 @@ public class InfluencerDao extends BaseDao {
         }
     }
 
-    public void initCollectionAndIndexes(String collectionName) {
+    public void initCollectionAndIndexes() {
         MongoDatabase db = mongoClient.getDatabase(database);
         db.createCollection(INFLUENCER_REG_COLLECTION);
 
         MongoCollection<Document> collection = db.getCollection(INFLUENCER_REG_COLLECTION);
 
         IndexOptions indexOptions = new IndexOptions()
-                .name("user_id_index");
+                .name("user_id_index")
+                .unique(true);;
         String resultCreateIndex = collection.createIndex(Indexes.ascending("userId"),
                 indexOptions);
         log.info(String.format("Index created: %s", resultCreateIndex));

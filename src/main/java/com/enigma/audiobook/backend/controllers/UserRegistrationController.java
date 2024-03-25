@@ -4,8 +4,11 @@ import com.enigma.audiobook.backend.models.User;
 import com.enigma.audiobook.backend.models.requests.UserRegistrationInfo;
 import com.enigma.audiobook.backend.models.responses.UserAssociationResponse;
 import com.enigma.audiobook.backend.service.OneGodService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 public class UserRegistrationController {
@@ -14,14 +17,17 @@ public class UserRegistrationController {
 
     @PostMapping("/users")
     @ResponseBody
-    public User createUser() {
-        return oneGodService.createUser();
+    public User createUser(@RequestHeader Map<String, String> headers,
+                           HttpServletRequest servletRequest) {
+        return oneGodService.createUser(headers, servletRequest.getRemoteAddr());
     }
 
     @PostMapping("/users/associations")
     @ResponseBody
-    public UserAssociationResponse associateAuthenticatedUser(@RequestBody UserRegistrationInfo userRegistrationInfo) {
-        return oneGodService.associateAuthenticatedUser(userRegistrationInfo);
+    public UserAssociationResponse associateAuthenticatedUser(@RequestBody UserRegistrationInfo userRegistrationInfo,
+                                                              @RequestHeader Map<String, String> headers,
+                                                              HttpServletRequest servletRequest) {
+        return oneGodService.associateAuthenticatedUser(userRegistrationInfo, headers, servletRequest.getRemoteAddr());
     }
 
     @GetMapping("/users/{userId}")

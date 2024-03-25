@@ -191,7 +191,7 @@ public class GodDao extends BaseDao {
         }
     }
 
-    public void initCollectionAndIndexes(String collectionName) {
+    public void initCollectionAndIndexes() {
         MongoDatabase db = mongoClient.getDatabase(database);
         db.createCollection(GOD_REG_COLLECTION);
 

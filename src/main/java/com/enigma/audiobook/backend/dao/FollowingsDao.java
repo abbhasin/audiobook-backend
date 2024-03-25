@@ -198,7 +198,7 @@ public class FollowingsDao extends BaseDao {
         return followings;
     }
 
-    public void initCollectionAndIndexes(String collectionName) {
+    public void initCollectionAndIndexes() {
         MongoDatabase db = mongoClient.getDatabase(database);
         db.createCollection(FOLLOWINGS_COLLECTION);
 

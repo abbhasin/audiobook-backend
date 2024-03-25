@@ -86,8 +86,9 @@ public class MandirController {
 
     @PostMapping("/mandirs/authorization")
     @ResponseBody
-    public void addMandirAuth(@RequestParam("mandirId") String mandirId, @RequestParam("userId") String userId) {
-        oneGodService.addMandirAuth(mandirId, userId);
+    public void addMandirAuth(@RequestParam("mandirId") String mandirId, @RequestParam("userId") String userId,
+                              @RequestHeader("registration-token") String registrationToken) {
+        oneGodService.addMandirAuth(mandirId, userId, registrationToken);
     }
 
     @GetMapping("/mandirs/{userId}")

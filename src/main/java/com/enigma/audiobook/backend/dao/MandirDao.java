@@ -183,7 +183,7 @@ public class MandirDao extends BaseDao {
         }
     }
 
-    public void initCollectionAndIndexes(String collectionName) {
+    public void initCollectionAndIndexes() {
         MongoDatabase db = mongoClient.getDatabase(database);
         db.createCollection(MANDIR_REG_COLLECTION);
 

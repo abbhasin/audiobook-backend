@@ -42,7 +42,10 @@ public class DarshansController {
     }
 
     @PostMapping("/darshans/curation")
-    public void invokeCurationOfDarshan() {
+    public void invokeCurationOfDarshan(
+            @RequestHeader("registration-token") String registrationToken
+    ) {
+        oneGodService.checkValidRegistrationToken(registrationToken);
         curatedDarshanHandler.run();
     }
 }
