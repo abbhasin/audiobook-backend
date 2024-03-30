@@ -118,6 +118,7 @@ public class ContentEncoderV2 {
         finalInputs.addAll(Arrays.asList(cmd));
         ProcessBuilder pb = new ProcessBuilder(finalInputs);
         File logFile = File.createTempFile(String.format("%s-%s", "contentEncoderLog", UUID.randomUUID()), ".log");
+        log.info("logging thumbnail time in log file:" + logFile.getAbsolutePath());
         try {
             logFile.deleteOnExit();
 //        pb.redirectErrorStream(true);
@@ -146,6 +147,7 @@ public class ContentEncoderV2 {
         ProcessBuilder pb = new ProcessBuilder(finalInputs);
 
         int exitVal = pb.inheritIO().start().waitFor();
+//        int exitVal = pb.start().waitFor();
         Preconditions.checkState(exitVal == 0, "process failed:" + inputs);
     }
 

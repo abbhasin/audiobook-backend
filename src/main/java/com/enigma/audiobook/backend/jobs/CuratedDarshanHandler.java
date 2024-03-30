@@ -24,7 +24,7 @@ public class CuratedDarshanHandler implements Runnable {
     final DarshanDao darshanDao;
 
     // config
-    static final int DEFUALT_DARSHAN_COUNT_PER_GOD = 1;
+    static final int DEFUALT_DARSHAN_COUNT_PER_GOD = 2;
     static final Map<String, Integer> darshanCountPerGod = new TreeMap<>();
 
     static {

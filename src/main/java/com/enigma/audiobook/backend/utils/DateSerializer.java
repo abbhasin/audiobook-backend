@@ -9,9 +9,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class DateSerializer extends JsonSerializer<Date> {
-    private static final SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX");
     @Override
     public void serialize(Date date, JsonGenerator gen, SerializerProvider serializerProvider) throws IOException {
+        SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX");
         if (date == null) {
             gen.writeNull();
         } else {

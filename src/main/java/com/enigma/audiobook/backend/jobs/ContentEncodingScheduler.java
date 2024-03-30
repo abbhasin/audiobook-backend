@@ -11,6 +11,7 @@ import com.google.common.base.Preconditions;
 import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +24,7 @@ import java.util.concurrent.*;
 @Slf4j
 @Component
 public class ContentEncodingScheduler implements Runnable {
-    private static final int jobRunnableSize = 5;
+    private static final int jobRunnableSize = 2;
     private static final ExecutorService jobRunnableExecutors = Executors.newFixedThreadPool(jobRunnableSize);
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final PostsDao postsDao;
@@ -32,6 +33,7 @@ public class ContentEncodingScheduler implements Runnable {
     private final ContentEncodingHandler contentEncodingHandler;
     private final String db;
 
+    @Autowired
     public ContentEncodingScheduler(PostsDao postsDao, DarshanDao darshanDao,
                                     ContentEncodingHandler contentEncodingHandler,
                                     @Value("${mongo.database}") String db) {
@@ -43,6 +45,7 @@ public class ContentEncodingScheduler implements Runnable {
     }
 
     public void start() {
+        log.info("starting content encoding scheduler");
         for (int i = 0; i < jobRunnableSize; i++) {
             jobRunnableExecutors.submit(
                     new JobRunnable(jobQueue, contentEncodingHandler, db, postsDao, darshanDao));
@@ -59,13 +62,15 @@ public class ContentEncodingScheduler implements Runnable {
                             .stream()
                             .map(post -> new CEJob(post.getPostId(), JobType.POST))
                             .toList();
+            log.info("post videos for content encoding:" + postVideoJobs);
             postVideoJobs.forEach(jobQueue::add);
 
             List<CEJob> postAudioJobs =
-                    postsDao.getPostsByTypeAndStatus(PostType.VIDEO, 20, Optional.empty(), ContentUploadStatus.RAW_UPLOADED)
+                    postsDao.getPostsByTypeAndStatus(PostType.AUDIO, 20, Optional.empty(), ContentUploadStatus.RAW_UPLOADED)
                             .stream()
                             .map(post -> new CEJob(post.getPostId(), JobType.POST))
                             .toList();
+            log.info("post audios for content encoding:" + postAudioJobs);
             postAudioJobs.forEach(jobQueue::add);
 
             List<CEJob> darshanJobs =
@@ -73,6 +78,7 @@ public class ContentEncodingScheduler implements Runnable {
                             .stream()
                             .map(darshan -> new CEJob(darshan.getDarshanId(), JobType.DARSHAN))
                             .toList();
+            log.info("darshan videos for content encoding:" + darshanJobs);
             darshanJobs.forEach(jobQueue::add);
         } catch (Throwable t) {
             log.error("unable to schedule content encoding", t);
@@ -99,8 +105,11 @@ public class ContentEncodingScheduler implements Runnable {
         @Override
         public void run() {
             while (true) {
+                CEJob ceJob = null;
                 try {
-                    CEJob ceJob = jobQueue.take();
+                    log.info("running consumer of jobs");
+                    ceJob = jobQueue.take();
+                    log.info("found job:" + ceJob);
                     switch (ceJob.getJobType()) {
                         case POST:
                             Optional<Post> post = postsDao.getPost(ceJob.getId());
@@ -120,7 +129,11 @@ public class ContentEncodingScheduler implements Runnable {
                             break;
                     }
                 } catch (Throwable t) {
-                    log.error("unable to process CEJob", t);
+                    log.error("unable to process CEJob:" + ceJob, t);
+                } finally {
+                    if (ceJob != null) {
+                        jobQueue.doneWithJob(ceJob);
+                    }
                 }
 
                 sleep();
@@ -139,11 +152,17 @@ public class ContentEncodingScheduler implements Runnable {
     public static class JobQueue {
         private final LinkedBlockingQueue<CEJob> linkedBlockingQueue = new LinkedBlockingQueue<>(60);
         private final Set<CEJob> queuedJobsSet = new HashSet<>();
+        private final Set<CEJob> runningJobsSet = new HashSet<>();
 
         @SneakyThrows
         public void add(CEJob ceJob) {
             if (queuedJobsSet.contains(ceJob)) {
                 log.info("CEJob already exists:{}", ceJob);
+                return;
+            }
+
+            if (runningJobsSet.contains(ceJob)) {
+                log.info("CEJob already running:{}", ceJob);
                 return;
             }
 
@@ -155,7 +174,12 @@ public class ContentEncodingScheduler implements Runnable {
         public CEJob take() {
             CEJob ceJob = linkedBlockingQueue.take();
             queuedJobsSet.remove(ceJob);
+            runningJobsSet.add(ceJob);
             return ceJob;
+        }
+
+        public void doneWithJob(CEJob ceJob) {
+            runningJobsSet.remove(ceJob);
         }
     }
 
