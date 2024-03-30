@@ -35,7 +35,7 @@ public class UserFeaturesDao extends BaseDao {
         Document query = new Document().append("userId", new ObjectId(userId));
 
         Bson updates = Updates.combine(
-                Updates.set("userId", userId),
+                Updates.set("userId", new ObjectId(userId)),
                 Updates.set(featureKey.name(), featureEnabledValue),
                 Updates.set("updateTime", getCurrentTime())
         );
