@@ -25,7 +25,7 @@ public class MyFeedController {
     @GetMapping("/feed")
     @ResponseBody
     public CuratedFeedResponse getCuratedFeed(@RequestBody CuratedFeedRequest curatedFeedRequest) {
-        return oneGodService.getCuratedFeed(curatedFeedRequest);
+        return oneGodService.getCuratedFeedV2(curatedFeedRequest);
     }
 
     @PostMapping("/feed/page")

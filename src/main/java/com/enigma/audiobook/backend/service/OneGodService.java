@@ -996,7 +996,7 @@ public class OneGodService {
     }
 
     public FeedPageResponse getCuratedFeedPage(CuratedFeedRequest curatedFeedRequest) {
-        CuratedFeedResponse curatedFeedResponse = getCuratedFeed(curatedFeedRequest);
+        CuratedFeedResponse curatedFeedResponse = getCuratedFeedV2(curatedFeedRequest);
         List<FeedItem> feedItems =
                 curatedFeedResponse.getPosts()
                         .stream()
@@ -1054,6 +1054,105 @@ public class OneGodService {
         feedPageResponse.setFeedItemHeader(feedItemHeader);
         feedPageResponse.setCuratedFeedPaginationKey(curatedFeedResponse.getCuratedFeedPaginationKey());
         return feedPageResponse;
+    }
+
+    public CuratedFeedResponse getCuratedFeedV2(CuratedFeedRequest curatedFeedRequest) {
+        String userId = curatedFeedRequest.getUserId();
+        checkUserExists(userId);
+
+        List<Following> followingsForUser = followingsDao.getFollowingsForUser(userId);
+
+        List<Following> mandirFollowings =
+                followingsForUser.stream()
+                        .filter(f -> f.getFollowingType().equals(FollowingType.MANDIR))
+                        .toList();
+
+        List<Following> influencerFollowings =
+                followingsForUser.stream()
+                        .filter(f -> f.getFollowingType().equals(FollowingType.INFLUENCER))
+                        .toList();
+
+        Map<String, List<Post>> lastNMandirFollowingPosts =
+                mandirFollowings.stream()
+                        .collect(Collectors.toMap(Following::getFolloweeId,
+                                f -> postsDao.getPosts(f.getFolloweeId(), PostAssociationType.MANDIR, 50)));
+
+        Map<String, List<Post>> lastNInfluencerFollowingPosts =
+                mandirFollowings.stream()
+                        .collect(Collectors.toMap(Following::getFolloweeId,
+                                f -> postsDao.getPosts(f.getFolloweeId(), PostAssociationType.INFLUENCER, 50)));
+
+        List<Post> curatedPosts = new ArrayList<>();
+        Set<String> curatedPostIds = new HashSet<>();
+        addCuratedPostsV2(curatedPosts, curatedPostIds, lastNMandirFollowingPosts, lastNInfluencerFollowingPosts);
+
+        CuratedFeedResponse curatedFeedResponse = new CuratedFeedResponse();
+        curatedFeedResponse.setPosts(curatedPosts);
+
+        return curatedFeedResponse;
+    }
+
+    public void addCuratedPostsV2(List<Post> curatedPosts,
+                                  Set<String> curatedPostIds,
+                                  Map<String, List<Post>> lastNMandirFollowingPosts,
+                                  Map<String, List<Post>> lastNInfluencerFollowingPosts) {
+        Integer countOfMandirPostPerIteration = 4;
+        Integer countOfInfluencerPostPerIteration = 2;
+
+        // mandir
+        List<Map.Entry<String, List<Post>>> postEntriesByMandir =
+                new ArrayList<>(lastNMandirFollowingPosts.entrySet());
+        AtomicInteger mandirPostsTotalCount =
+                new AtomicInteger((int) lastNMandirFollowingPosts.values()
+                        .stream()
+                        .mapToLong(List::size)
+                        .sum());
+        AtomicInteger postEntriesByMandirPtr = new AtomicInteger(0);
+
+        Map<String, Integer> postEntriesPtrByMandir =
+                lastNMandirFollowingPosts.entrySet()
+                        .stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+
+        // influencer
+        List<Map.Entry<String, List<Post>>> postEntriesByInfluencer =
+                new ArrayList<>(lastNInfluencerFollowingPosts.entrySet());
+        AtomicInteger influencerPostsTotalCount =
+                new AtomicInteger((int) lastNInfluencerFollowingPosts.values()
+                        .stream()
+                        .mapToLong(List::size)
+                        .sum());
+        AtomicInteger postEntriesByInfluencerPtr = new AtomicInteger(0);
+
+        Map<String, Integer> postEntriesPtrByInfluencer =
+                lastNMandirFollowingPosts.entrySet()
+                        .stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+
+        while (curatedPosts.size() < 100 &&
+                (mandirPostsTotalCount.get() > 0 ||
+                        influencerPostsTotalCount.get() > 0)
+        ) {
+            // mandir posts
+            addMandirPosts(countOfMandirPostPerIteration,
+                    mandirPostsTotalCount,
+                    postEntriesByMandir,
+                    postEntriesByMandirPtr,
+                    postEntriesPtrByMandir,
+                    curatedPostIds,
+                    new HashSet<>(),
+                    curatedPosts);
+
+            // influencer posts
+            addMandirPosts(countOfInfluencerPostPerIteration,
+                    influencerPostsTotalCount,
+                    postEntriesByInfluencer,
+                    postEntriesByInfluencerPtr,
+                    postEntriesPtrByInfluencer,
+                    curatedPostIds,
+                    new HashSet<>(),
+                    curatedPosts);
+        }
     }
 
     public CuratedFeedResponse getCuratedFeed(CuratedFeedRequest curatedFeedRequest) {
