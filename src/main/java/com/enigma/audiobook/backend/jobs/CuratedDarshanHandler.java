@@ -9,6 +9,8 @@ import com.enigma.audiobook.backend.models.CuratedDarshan;
 import com.enigma.audiobook.backend.models.Darshan;
 import com.enigma.audiobook.backend.models.God;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.bson.types.ObjectId;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 
 @Component
 @AllArgsConstructor
+@Slf4j
 public class CuratedDarshanHandler implements Runnable {
     final CuratedDarshanDao curatedDarshanDao;
     final GodDao godDao;
@@ -30,7 +33,7 @@ public class CuratedDarshanHandler implements Runnable {
     static {
         darshanCountPerGod.put("Guru Nanak Ji", 3);
         darshanCountPerGod.put("Shiva", 2);
-        darshanCountPerGod.put("Vishnu", 1);
+        darshanCountPerGod.put("Vishnu", 2);
     }
 
     public void updateDarshanCountPerGod(String godName, Integer count) {
@@ -101,8 +104,7 @@ public class CuratedDarshanHandler implements Runnable {
                 lastGodsMandir.get(),
                 countOfDarshansToFetchForGod);
 
-        nextGodToDarshans.put(god.getGodName(),
-                new ArrayList<>(darshans.stream().map(Darshan::getDarshanId).collect(Collectors.toSet())));
+        nextGodToDarshans.put(god.getGodName(), darshans.stream().map(Darshan::getDarshanId).toList());
 
         lastGodsMandir.set(darshans
                 .stream()
@@ -122,13 +124,14 @@ public class CuratedDarshanHandler implements Runnable {
                                                 String lastDarshanId,
                                                 String excludingMandir,
                                                 int countOfDarshansToFetchForGod) {
-
         List<Darshan> darshans = getDarshanByGodAfterLastDarshanExcludingMandir(
                 godId,
                 lastDarshanId,
                 excludingMandir,
                 countOfDarshansToFetchForGod
         );
+
+        darshans = new ArrayList<>(darshans.stream().distinct().toList());
 
         if (darshans.size() < countOfDarshansToFetchForGod) {
             darshans.addAll(getDarshanByGodAfterLastDarshan(
@@ -138,6 +141,10 @@ public class CuratedDarshanHandler implements Runnable {
             ));
         }
 
+        darshans = new ArrayList<>(darshans.stream().distinct()
+                .sorted(Comparator.comparing(d -> new ObjectId(d.getDarshanId())))
+                .toList());
+
         if (darshans.size() < countOfDarshansToFetchForGod) {
             darshans.addAll(getDarshanByGod(
                     godId,
@@ -145,6 +152,7 @@ public class CuratedDarshanHandler implements Runnable {
             ));
         }
 
+        darshans = new ArrayList<>(darshans.stream().distinct().toList());
         return darshans;
     }
 
