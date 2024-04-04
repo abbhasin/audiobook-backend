@@ -5,8 +5,8 @@ import com.enigma.audiobook.backend.dao.PostsDao;
 import com.enigma.audiobook.backend.jobs.ContentEncoderV2;
 import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Post;
+import com.google.common.base.Preconditions;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,17 +15,14 @@ import java.util.Optional;
 
 import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
-@Component
 public class PostsContentTransformer extends BaseContentTransformer {
     final PostsDao postsDao;
-    Post post;
+    volatile Post post;
 
     public PostsContentTransformer(S3Proxy s3Proxy, PostsDao postsDao,
-                                   @Value("${s3-config.bucket_url}") String bucket_url,
-                                   @Value("${s3-config.bucket}") String bucket,
-                                   @Value("${content-transformer-config.inputContentLocalFilePathPrefixWOScheme}")
+                                   String bucket_url,
+                                   String bucket,
                                    String inputContentLocalFilePathPrefixWOScheme,
-                                   @Value("${content-transformer-config.outputContentLocalFilePathPrefixWOScheme}")
                                    String outputContentLocalFilePathPrefixWOScheme) {
         super(bucket_url, bucket,
                 inputContentLocalFilePathPrefixWOScheme,
@@ -58,6 +55,22 @@ public class PostsContentTransformer extends BaseContentTransformer {
 
     @Override
     protected void updateDBEntry() {
+        switch (post.getType()) {
+            case VIDEO:
+                Preconditions.checkState(post.getVideoUrl().endsWith("m3u8"));
+                Preconditions.checkState(post.getThumbnailUrl().endsWith("jpg"));
+                Preconditions.checkState(post.getVideoUrl().contains("processed/"));
+                Preconditions.checkState(post.getThumbnailUrl().contains("processed/"));
+                break;
+            case AUDIO:
+                Preconditions.checkState(post.getAudioUrl().endsWith("m3u8"));
+                Preconditions.checkState(post.getAudioUrl().contains("processed/"));
+                break;
+            case IMAGES:
+                Preconditions.checkState(post.getImagesUrl().stream().allMatch(img -> img.contains("processed/")));
+                break;
+        }
+
         postsDao.updatePost(post.getPostId(), ContentUploadStatus.PROCESSED, post.getType(),
                 post.getThumbnailUrl(), post.getVideoUrl(),
                 post.getImagesUrl(),

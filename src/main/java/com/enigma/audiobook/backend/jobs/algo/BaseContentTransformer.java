@@ -26,14 +26,7 @@ public abstract class BaseContentTransformer {
         this.inputContentLocalFilePathPrefixWOScheme = inputContentLocalFilePathPrefixWOScheme;
         this.outputContentLocalFilePathPrefixWOScheme = outputContentLocalFilePathPrefixWOScheme;
         this.s3Proxy = s3Proxy;
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            public void run() {
-                log.info("running shutdown hook for encoder");
-                removeStagedData(Arrays.asList(inputContentLocalFilePathPrefixWOScheme, outputContentLocalFilePathPrefixWOScheme));
-            }
-        });
     }
-
 
     protected void handleContent(List<String> inputContentUrls, String outputS3KeyFormat) {
         List<String> inputDirs = new ArrayList<>();
@@ -103,7 +96,7 @@ public abstract class BaseContentTransformer {
 
     }
 
-    private void removeStagedData(List<String> dirs) {
+    public static void removeStagedData(List<String> dirs) {
         for (String dir : dirs) {
             File f = new File(dir);
             f.deleteOnExit();

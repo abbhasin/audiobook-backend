@@ -234,8 +234,14 @@ public class PostsDao extends BaseDao {
         MongoCollection<Document> collection = getCollection();
 
         Bson godIdFilter = eq("associatedGodId", new ObjectId(godId));
+
         Bson godNameTagFilter = eq("tag", godName);
-        Bson filter = Filters.and(getIsDeletedFilter(false), Filters.or(godIdFilter, godNameTagFilter));
+        Bson contentTypeFilterForTaggedGods =
+                Filters.in("type",
+                        PostType.AUDIO.name(), PostType.VIDEO.name(), PostType.IMAGES.name());
+        Bson godNameTagCompositeFilter = Filters.and(godNameTagFilter, contentTypeFilterForTaggedGods);
+
+        Bson filter = Filters.and(getIsDeletedFilter(false), Filters.or(godIdFilter, godNameTagCompositeFilter));
 
         Bson contentFilterProcessed = Filters.or(
                 Filters.eq("contentUploadStatus", ContentUploadStatus.PROCESSED),
@@ -483,6 +489,13 @@ public class PostsDao extends BaseDao {
         resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "type", "_id"),
                 indexOptions);
         log.info(String.format("Index created: %s", resultCreateIndex));
+
+        indexOptions = new IndexOptions()
+                .name("god_tag_index");
+        resultCreateIndex = collection.createIndex(Indexes.descending("contentUploadStatus", "tag", "type", "_id"),
+                indexOptions);
+        log.info(String.format("Index created: %s", resultCreateIndex));
+
     }
 
     private Bson getIsDeletedFilter(boolean isDeleted) {
