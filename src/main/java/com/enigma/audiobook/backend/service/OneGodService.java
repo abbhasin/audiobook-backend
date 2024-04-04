@@ -1072,19 +1072,34 @@ public class OneGodService {
                         .filter(f -> f.getFollowingType().equals(FollowingType.INFLUENCER))
                         .toList();
 
+        List<Following> godFollowings =
+                followingsForUser.stream()
+                        .filter(f -> f.getFollowingType().equals(FollowingType.GOD))
+                        .toList();
+
         Map<String, List<Post>> lastNMandirFollowingPosts =
                 mandirFollowings.stream()
                         .collect(Collectors.toMap(Following::getFolloweeId,
                                 f -> postsDao.getPosts(f.getFolloweeId(), PostAssociationType.MANDIR, 50)));
 
         Map<String, List<Post>> lastNInfluencerFollowingPosts =
-                mandirFollowings.stream()
+                influencerFollowings.stream()
                         .collect(Collectors.toMap(Following::getFolloweeId,
-                                f -> postsDao.getPosts(f.getFolloweeId(), PostAssociationType.INFLUENCER, 50)));
+                                f -> postsDao.getPostForInfluencer(f.getFolloweeId(), 50, Optional.empty(), true)));
+
+        Map<String, List<Post>> lastNGodFollowingPosts =
+                godFollowings.stream()
+                        .map(godFollowing -> godDao.getGod(godFollowing.getFolloweeId()))
+                        .filter(Optional::isPresent)
+                        .collect(Collectors.toMap(g -> g.get().getGodId(),
+                                g -> postsDao.getPostOfGod(g.get().getGodId(),
+                                        g.get().getGodName(),
+                                        50, Optional.empty(), true)));
 
         List<Post> curatedPosts = new ArrayList<>();
         Set<String> curatedPostIds = new HashSet<>();
-        addCuratedPostsV2(curatedPosts, curatedPostIds, lastNMandirFollowingPosts, lastNInfluencerFollowingPosts);
+        addCuratedPostsV2(curatedPosts, curatedPostIds,
+                lastNMandirFollowingPosts, lastNInfluencerFollowingPosts, lastNGodFollowingPosts);
 
         CuratedFeedResponse curatedFeedResponse = new CuratedFeedResponse();
         curatedFeedResponse.setPosts(curatedPosts);
@@ -1095,9 +1110,11 @@ public class OneGodService {
     public void addCuratedPostsV2(List<Post> curatedPosts,
                                   Set<String> curatedPostIds,
                                   Map<String, List<Post>> lastNMandirFollowingPosts,
-                                  Map<String, List<Post>> lastNInfluencerFollowingPosts) {
+                                  Map<String, List<Post>> lastNInfluencerFollowingPosts,
+                                  Map<String, List<Post>> lastNGodFollowingPosts) {
         Integer countOfMandirPostPerIteration = 4;
-        Integer countOfInfluencerPostPerIteration = 2;
+        Integer countOfInfluencerPostPerIteration = 4;
+        Integer countOfGodPostPerIteration = 4;
 
         // mandir
         List<Map.Entry<String, List<Post>>> postEntriesByMandir =
@@ -1125,13 +1142,29 @@ public class OneGodService {
         AtomicInteger postEntriesByInfluencerPtr = new AtomicInteger(0);
 
         Map<String, Integer> postEntriesPtrByInfluencer =
-                lastNMandirFollowingPosts.entrySet()
+                lastNInfluencerFollowingPosts.entrySet()
+                        .stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
+
+        // god
+        List<Map.Entry<String, List<Post>>> postEntriesByGod =
+                new ArrayList<>(lastNGodFollowingPosts.entrySet());
+        AtomicInteger godPostsTotalCount =
+                new AtomicInteger((int) lastNGodFollowingPosts.values()
+                        .stream()
+                        .mapToLong(List::size)
+                        .sum());
+        AtomicInteger postEntriesByGodPtr = new AtomicInteger(0);
+
+        Map<String, Integer> postEntriesPtrByGod =
+                lastNGodFollowingPosts.entrySet()
                         .stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size()));
 
         while (curatedPosts.size() < 100 &&
                 (mandirPostsTotalCount.get() > 0 ||
-                        influencerPostsTotalCount.get() > 0)
+                        influencerPostsTotalCount.get() > 0 ||
+                        godPostsTotalCount.get() > 0)
         ) {
             // mandir posts
             addMandirPosts(countOfMandirPostPerIteration,
@@ -1149,6 +1182,16 @@ public class OneGodService {
                     postEntriesByInfluencer,
                     postEntriesByInfluencerPtr,
                     postEntriesPtrByInfluencer,
+                    curatedPostIds,
+                    new HashSet<>(),
+                    curatedPosts);
+
+            // god posts
+            addMandirPosts(countOfGodPostPerIteration,
+                    godPostsTotalCount,
+                    postEntriesByGod,
+                    postEntriesByGodPtr,
+                    postEntriesPtrByGod,
                     curatedPostIds,
                     new HashSet<>(),
                     curatedPosts);
