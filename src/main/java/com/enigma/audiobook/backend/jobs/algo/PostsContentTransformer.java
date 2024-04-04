@@ -6,6 +6,7 @@ import com.enigma.audiobook.backend.jobs.ContentEncoderV2;
 import com.enigma.audiobook.backend.models.ContentUploadStatus;
 import com.enigma.audiobook.backend.models.Post;
 import com.google.common.base.Preconditions;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 import static com.enigma.audiobook.backend.utils.ObjectStoreMappingUtils.*;
 
+@Slf4j
 public class PostsContentTransformer extends BaseContentTransformer {
     final PostsDao postsDao;
     volatile Post post;
@@ -34,6 +36,7 @@ public class PostsContentTransformer extends BaseContentTransformer {
 
     public void handlePost(Post post) {
         this.post = post;
+        log.info("handling post:{}", post);
         String outputS3KeyFormat = null;
         switch (post.getType()) {
             case VIDEO:
@@ -55,20 +58,23 @@ public class PostsContentTransformer extends BaseContentTransformer {
 
     @Override
     protected void updateDBEntry() {
+        log.info("updating db for post:{}", post);
         switch (post.getType()) {
             case VIDEO:
+                Preconditions.checkState(post.getVideoUrl().contains(post.getPostId()));
+                Preconditions.checkState(post.getThumbnailUrl().contains(post.getPostId()));
                 Preconditions.checkState(post.getVideoUrl().endsWith("m3u8"));
                 Preconditions.checkState(post.getThumbnailUrl().endsWith("jpg"));
                 Preconditions.checkState(post.getVideoUrl().contains("processed/"));
                 Preconditions.checkState(post.getThumbnailUrl().contains("processed/"));
                 break;
             case AUDIO:
+                Preconditions.checkState(post.getAudioUrl().contains(post.getPostId()));
                 Preconditions.checkState(post.getAudioUrl().endsWith("m3u8"));
                 Preconditions.checkState(post.getAudioUrl().contains("processed/"));
                 break;
-            case IMAGES:
-                Preconditions.checkState(post.getImagesUrl().stream().allMatch(img -> img.contains("processed/")));
-                break;
+            default:
+                throw new IllegalStateException("unhandled type:" + post.getType());
         }
 
         postsDao.updatePost(post.getPostId(), ContentUploadStatus.PROCESSED, post.getType(),
@@ -79,6 +85,7 @@ public class PostsContentTransformer extends BaseContentTransformer {
 
     @Override
     protected Optional<String> getContentType(String fileName) {
+        log.info("get content type for file:{}", fileName);
         if (fileName.endsWith("m3u8")) {
             return Optional.of("application/x-mpegURL");
         } else if (fileName.endsWith("ts")) {
@@ -92,6 +99,8 @@ public class PostsContentTransformer extends BaseContentTransformer {
 
     @Override
     protected void encodeContentToDir(String inputContentLocalFilePath, String outputDir) throws Exception {
+        log.info("encode content, inputContentLocalFilePath:{}, outputDir:{}, post:{}",
+                inputContentLocalFilePath, outputDir, post);
         switch (post.getType()) {
             case VIDEO:
                 ContentEncoderV2.updateVideoContentToDir(inputContentLocalFilePath, outputDir);
@@ -113,19 +122,25 @@ public class PostsContentTransformer extends BaseContentTransformer {
         switch (post.getType()) {
             case VIDEO:
                 if (fileName.endsWith("m3u8")) {
+                    log.info("add to upload list:{}, url:{}", fileName, s3ObjectURL);
                     post.setVideoUrl(s3ObjectURL);
                 } else if (fileName.endsWith("jpg")) {
+                    log.info("add to upload list:{}, url:{}", fileName, s3ObjectURL);
                     post.setThumbnailUrl(s3ObjectURL);
                 }
                 break;
             case AUDIO:
                 if (fileName.endsWith("m3u8")) {
+                    log.info("add to upload list:{}, url:{}", fileName, s3ObjectURL);
                     post.setAudioUrl(s3ObjectURL);
                 }
                 break;
             case IMAGES:
                 if (fileName.endsWith("jpg")) {
-                    List<String> images = post.getImagesUrl() == null ? new ArrayList<>() : post.getImagesUrl();
+                    log.info("add to upload list:{}, url:{}", fileName, s3ObjectURL);
+                    List<String> images =
+                            post.getImagesUrl().stream().anyMatch(img -> img.contains("raw/")) ? new ArrayList<>()
+                            : post.getImagesUrl();
                     images.add(s3ObjectURL);
                     post.setImagesUrl(images);
                 }

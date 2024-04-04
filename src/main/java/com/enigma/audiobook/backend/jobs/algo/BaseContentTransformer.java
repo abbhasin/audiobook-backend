@@ -64,9 +64,14 @@ public abstract class BaseContentTransformer {
                 File[] outputFiles = Objects.requireNonNull(outputDirFile.listFiles());
                 for (File f : outputFiles) {
                     log.info("file path:{}, f:{}", f.getAbsolutePath(), f.toURI());
+
                     String fileName = f.getName();
                     String s3OutputObjectKey = String.format(outputS3KeyFormat, fileName);
-                    addToUploadsList(fileName, getObjectUrl(s3OutputObjectKey));
+
+                    String objectUrl = getObjectUrl(s3OutputObjectKey);
+                    log.info("s3 object key:{}, objectUrl:{}", s3OutputObjectKey, objectUrl);
+
+                    addToUploadsList(fileName, objectUrl);
 
                     Optional<String> contentType = getContentType(fileName);
                     s3Proxy.putObject(bucket, s3OutputObjectKey, f, contentType);
