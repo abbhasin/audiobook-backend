@@ -192,7 +192,7 @@ public class ContentUploadUtils {
     @Getter
     public enum ContentTypeByExtension {
         VIDEO(Map.ofEntries(Map.entry("mp4", "video/mp4"), Map.entry("*", "video/mpeg")),
-                2 * ONE_GB),
+                256 * ONE_MB),
         AUDIO(Map.ofEntries(Map.entry("mp3", "audio/mpeg"), Map.entry("*", "audio/mpeg")),
                 50 * ONE_MB),
         IMAGE(Map.ofEntries(Map.entry("jpeg", "image/jpeg"),

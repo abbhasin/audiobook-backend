@@ -2,7 +2,7 @@ env:
   profile: dev
 
 mongo:
-  url: mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=service
+  url: mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=service #mongodb://127.0.0.1:27020/?directConnection=true&serverSelectionTimeoutMS=2000&appName=service
   database: dev
 
 s3-config:

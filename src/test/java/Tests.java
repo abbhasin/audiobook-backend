@@ -1,6 +1,8 @@
 import com.enigma.audiobook.backend.models.God;
 import com.enigma.audiobook.backend.models.Post;
 import com.enigma.audiobook.backend.utils.SerDe;
+import org.apache.http.client.utils.DateUtils;
+import org.junit.Test;
 
 import java.net.URI;
 import java.text.ParseException;
@@ -10,7 +12,14 @@ import java.util.concurrent.*;
 
 public class Tests {
 
-    public static void main1(String[] args) throws ParseException {
+    public static void main(String[] args) throws ParseException {
+        String[] acceptedFormats = {"yyyy-MM-dd'T'HH:mm:ss.SSSX","yyyy-MM-dd'T'HH:mm:ssX","yyyy-MM-dd'T'HH:mm:ss.SSSXXX"};
+        SimpleDateFormat formatter1 = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
+        Date d1 = DateUtils.parseDate("2024-04-01T02:04:14Z", acceptedFormats);
+        System.out.println("zzz date is:" + d1);
+        Date d3 = DateUtils.parseDate("2024-04-01T02:04:14.000+00:00", acceptedFormats);
+        System.out.println("zzz date is:" + d3);
+
         URI uri = URI.create("https://one-god-dev.s3.ap-south-1.amazonaws.com/dir1/dir2/objectKey.mp4");
         System.out.println(uri);
         System.out.println(uri.getAuthority());
@@ -69,10 +78,10 @@ public class Tests {
         System.out.println(serDe.fromJson(pStr, Post.class));
     }
 
-    public static void main(String[] args) throws InterruptedException {
-    }
+
     static ExecutorService executor1 = Executors.newFixedThreadPool(2);
     static ExecutorService executor2 = Executors.newFixedThreadPool(2);
+
     public static void main2(String[] args) throws InterruptedException {
 
 
@@ -100,14 +109,14 @@ public class Tests {
                 throw new RuntimeException(e);
             }
         });
-        Thread.sleep(5*1000);
+        Thread.sleep(5 * 1000);
         f1.cancel(true);
         while (true) {
             if (f1.isCancelled()) {
                 System.out.println("first thread interrupted");
                 return;
             }
-            if(f1.isDone()) {
+            if (f1.isDone()) {
                 System.out.println("first thread is done");
                 return;
             }
@@ -129,5 +138,15 @@ public class Tests {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    @Test
+    public void test1() {
+        System.out.println("hello world");
+    }
+
+    @Test
+    public void test2() {
+        throw new RuntimeException("test exception");
     }
 }

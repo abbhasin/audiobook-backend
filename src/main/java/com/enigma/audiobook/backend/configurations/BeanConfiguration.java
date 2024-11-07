@@ -46,7 +46,7 @@ public class BeanConfiguration {
         return new InfluencerDao(mongoClient, database);
     }
 
-    @Bean
+    @Bean(name = "justDarshanDao")
     public DarshanDao darshanDao(MongoClient mongoClient, @Value("${mongo.database}") String database) {
         return new DarshanDao(mongoClient, database);
     }

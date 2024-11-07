@@ -22,7 +22,6 @@ import static com.mongodb.client.model.Sorts.ascending;
 import static com.mongodb.client.model.Sorts.descending;
 
 @Slf4j
-@Repository
 public class DarshanDao extends BaseDao {
 
     private final MongoClient mongoClient;

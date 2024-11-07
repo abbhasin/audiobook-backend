@@ -12,6 +12,8 @@ import com.google.common.base.Preconditions;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,6 +33,8 @@ public class OneGodService {
     private final GodDao godDao;
     private final InfluencerDao influencerDao;
     private final PostsDao postsDao;
+    @Autowired
+    @Qualifier(value = "justDarshanDao")
     private final DarshanDao darshanDao;
     private final CuratedDarshanDao curatedDarshanDao;
     private final MandirDao mandirDao;
